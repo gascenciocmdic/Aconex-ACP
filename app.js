@@ -342,7 +342,7 @@ async function syncNotifications() {
     
     const engine = new SyncEngine(null, globalConfig);
     try {
-        const xml = await engine.client.fetchMail({ mail_box: 'Inbox', search_query: 'mailtype:Transmittal' });
+        const xml = await engine.client.fetchMail({ mail_box: 'Inbox' });
         // Volcamos al log técnico para depuración
         if (techLog) techLog.value += `\n--- DEBUG TRANSMITTAL XML ---\n${xml}\n`;
         
