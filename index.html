@@ -178,15 +178,34 @@
         <!-- NOTIFICACIONES VIEW     -->
         <!-- ======================= -->
         <div id="view-notificaciones" class="view-section hidden animate-fade-in">
-            <div class="flex justify-between items-center mb-8">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                    <h2 class="text-2xl font-bold text-white">Transmittals No Leídos</h2>
-                    <p class="text-slate-400 text-sm mt-1">Inbox de Project Mail filtrado por correos pendientes de lectura.</p>
+                    <h2 class="text-2xl font-bold text-white">Listado de Transmittals</h2>
+                    <p class="text-slate-400 text-sm mt-1">Todos los registros de correspondencia de tipo Transmittal en el proyecto.</p>
                 </div>
-                <button id="btnRefreshNotif" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 border border-slate-700 transition-all">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                    Actualizar
+                <button id="btnRefreshNotif" class="bg-brand hover:bg-brand-hover text-white px-6 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 shadow-lg shadow-brand/20 transition-all">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    Extraer Transmittals
                 </button>
+            </div>
+
+            <!-- FILTERS FOR TRANSMITTALS -->
+            <div class="glass-card mb-6 p-4 rounded-xl border border-slate-700/50 flex flex-wrap gap-4 items-center">
+                <div class="flex-1 min-w-[200px]">
+                    <div class="relative">
+                        <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        <input type="text" id="filterTransSearch" placeholder="Buscar por asunto o remitente..." class="w-full bg-slate-900/50 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition-all">
+                    </div>
+                </div>
+                <select id="filterTransUser" class="bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 outline-none focus:ring-1 focus:ring-brand">
+                    <option value="">Remitente (Todos)</option>
+                </select>
+                <select id="filterTransOrg" class="bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 outline-none focus:ring-1 focus:ring-brand">
+                    <option value="">Organización (Todos)</option>
+                </select>
+                <div class="flex items-center gap-2 px-3 py-2 bg-slate-800/50 rounded-lg border border-slate-700 text-xs text-slate-400">
+                    <span id="transCount" class="font-bold text-brand">0</span> registros
+                </div>
             </div>
 
             <div class="glass-card rounded-xl overflow-hidden border border-slate-700/50">
@@ -194,16 +213,24 @@
                     <table class="w-full text-left text-sm whitespace-nowrap">
                         <thead class="bg-slate-800/50 text-slate-300 uppercase text-xs font-semibold tracking-wider">
                             <tr>
-                                <th class="px-6 py-4">De (Usuario)</th>
-                                <th class="px-6 py-4">Organización</th>
-                                <th class="px-6 py-4">Asunto del Transmittal</th>
-                                <th class="px-6 py-4">Fecha Recibido</th>
+                                <th class="px-6 py-4 cursor-pointer hover:text-brand transition-colors group" data-sort-trans="fromUser">
+                                    De (Usuario) <span class="sort-icon opacity-30">↕</span>
+                                </th>
+                                <th class="px-6 py-4 cursor-pointer hover:text-brand transition-colors group" data-sort-trans="fromOrg">
+                                    Organización <span class="sort-icon opacity-30">↕</span>
+                                </th>
+                                <th class="px-6 py-4 cursor-pointer hover:text-brand transition-colors group" data-sort-trans="subject">
+                                    Asunto del Transmittal <span class="sort-icon opacity-30">↕</span>
+                                </th>
+                                <th class="px-6 py-4 cursor-pointer hover:text-brand transition-colors group" data-sort-trans="date">
+                                    Fecha Recibido <span class="sort-icon opacity-30">↕</span>
+                                </th>
                             </tr>
                         </thead>
                         <tbody id="notifTableBody" class="divide-y divide-slate-700/50 text-slate-300">
                             <tr>
                                 <td colspan="4" class="px-6 py-12 text-center text-slate-500 italic">
-                                    Presiona actualizar para buscar correos no leídos...
+                                    Presiona "Extraer Transmittals" para obtener el listado completo...
                                 </td>
                             </tr>
                         </tbody>

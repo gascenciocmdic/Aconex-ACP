@@ -105,20 +105,18 @@ class SyncEngine {
         return transmittals;
     }
 
-    async syncUnreadTransmittals(onFinished) {
+    async syncAllTransmittals(onFinished) {
         try {
-            // mail_type_id=-2 suele ser Transmittal en Aconex. 
-            // unread=true filtra solo los no leídos.
+            // Obtenemos todos los Transmittals (mail_type_id=-2) sin filtrar por "unread"
             const params = {
-                mail_type_id: -2,
-                unread: 'true'
+                mail_type_id: -2
             };
             const xml = await this.client.fetchMail(params);
             const list = this.parseTransmittalsFromXml(xml);
             if (onFinished) onFinished(list);
             return list;
         } catch (e) {
-            console.error("Error sincronizando notificaciones:", e);
+            console.error("Error sincronizando transmittals:", e);
             return [];
         }
     }

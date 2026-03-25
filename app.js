@@ -43,9 +43,14 @@ const confPageSize = document.getElementById('confPageSize');
 // Notification UI
 const notifTableBody = document.getElementById('notifTableBody');
 const btnRefreshNotif = document.getElementById('btnRefreshNotif');
+const filterTransSearch = document.getElementById('filterTransSearch');
+const filterTransUser = document.getElementById('filterTransUser');
+const filterTransOrg = document.getElementById('filterTransOrg');
+const transCount = document.getElementById('transCount');
 
 // State
 let localDB = []; 
+let localTransmittalsDB = [];
 let isSyncing = false;
 let globalConfig = {
     projectId: confProjectId.value,
@@ -56,6 +61,11 @@ let globalConfig = {
 let sortState = {
     field: 'docno',
     direction: 'asc' // asc, desc
+};
+
+let transSortState = {
+    field: 'date',
+    direction: 'desc'
 };
 
 // ======================================
@@ -270,39 +280,100 @@ function updateFilterOptions() {
     });
 }
 
+// Transmittal Filters & Sorting
+[filterTransSearch, filterTransUser, filterTransOrg].forEach(el => {
+    el.addEventListener('change', renderNotifications);
+    if(el.id === 'filterTransSearch') el.addEventListener('input', renderNotifications);
+});
+
+function handleTransSort(field) {
+    if (transSortState.field === field) {
+        transSortState.direction = transSortState.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+        transSortState.field = field;
+        transSortState.direction = 'asc';
+    }
+    
+    document.querySelectorAll('th[data-sort-trans] .sort-icon').forEach(icon => {
+        icon.textContent = '↕';
+        icon.classList.add('opacity-30');
+    });
+    const activeHeader = document.querySelector(`th[data-sort-trans="${field}"]`);
+    if (activeHeader) {
+        const icon = activeHeader.querySelector('.sort-icon');
+        icon.textContent = transSortState.direction === 'asc' ? '↑' : '↓';
+        icon.classList.remove('opacity-30');
+        icon.classList.add('opacity-100');
+    }
+
+    renderNotifications();
+}
+
+document.querySelectorAll('th[data-sort-trans]').forEach(th => {
+    th.addEventListener('click', () => handleTransSort(th.dataset.sortTrans));
+});
+
 // ======================================
 // 4. Notifications Engine
 // ======================================
 async function syncNotifications() {
     if (!globalConfig.username || !globalConfig.password) return;
     
-    notifTableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-slate-500 italic"><span class="animate-pulse">Consultando Inbox de Aconex...</span></td></tr>`;
+    notifTableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-slate-500 italic"><span class="animate-pulse">Consultando todos los Transmittals de Aconex...</span></td></tr>`;
     
     const engine = new SyncEngine(null, globalConfig);
     try {
-        const transmittals = await engine.syncUnreadTransmittals();
-        renderNotifications(transmittals);
+        localTransmittalsDB = await engine.syncAllTransmittals();
+        updateTransFilterOptions();
+        renderNotifications();
         
-        // Update Badge
-        if (transmittals.length > 0) {
-            notifBadge.classList.remove('hidden');
-            notifBadge.textContent = transmittals.length; // Si quisiéramos texto, pero es un punto rojo
-        } else {
-            notifBadge.classList.add('hidden');
-        }
+        // Update Badge (only if we wanted to keep the "unread" concept, 
+        // but for now let's just show the dot if there are any new items since last session)
+        notifBadge.classList.add('hidden'); 
     } catch (e) {
         notifTableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-red-500 border border-red-500/20 bg-red-500/5">Error: ${e.message}</td></tr>`;
     }
 }
 
-function renderNotifications(items) {
-    if (items.length === 0) {
-        notifTableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-slate-500 italic">No tienes Transmittals pendientes por leer.</td></tr>`;
+function renderNotifications() {
+    const query = filterTransSearch.value.toLowerCase();
+    const userF = filterTransUser.value;
+    const orgF = filterTransOrg.value;
+
+    let filtered = localTransmittalsDB.filter(item => {
+        const matchQ = !query || item.subject.toLowerCase().includes(query) || item.fromUser.toLowerCase().includes(query);
+        const matchU = !userF || item.fromUser === userF;
+        const matchO = !orgF || item.fromOrg === orgF;
+        return matchQ && matchU && matchO;
+    });
+
+    // Sort
+    filtered.sort((a, b) => {
+        let valA = a[transSortState.field] || '';
+        let valB = b[transSortState.field] || '';
+        
+        if (transSortState.field === 'date') {
+            valA = new Date(valA).getTime();
+            valB = new Date(valB).getTime();
+        } else {
+            valA = valA.toString().toLowerCase();
+            valB = valB.toString().toLowerCase();
+        }
+
+        if (valA < valB) return transSortState.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return transSortState.direction === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    transCount.textContent = filtered.length;
+
+    if (filtered.length === 0) {
+        notifTableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-slate-500 italic">No se encontraron Transmittals con los filtros aplicados.</td></tr>`;
         return;
     }
 
     let html = '';
-    items.forEach(item => {
+    filtered.forEach(item => {
         let displayDate = item.date;
         try { displayDate = new Date(item.date).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }); } catch(e){}
 
@@ -316,6 +387,23 @@ function renderNotifications(items) {
         `;
     });
     notifTableBody.innerHTML = html;
+}
+
+function updateTransFilterOptions() {
+    const fields = [
+        { id: 'filterTransUser', key: 'fromUser', label: 'Remitente' },
+        { id: 'filterTransOrg', key: 'fromOrg', label: 'Organización' }
+    ];
+
+    fields.forEach(f => {
+        const el = document.getElementById(f.id);
+        const uniqueValues = [...new Set(localTransmittalsDB.map(d => d[f.key]).filter(v => v))].sort();
+        let html = `<option value="">${f.label} (Todos)</option>`;
+        uniqueValues.forEach(val => {
+            html += `<option value="${val}">${val}</option>`;
+        });
+        el.innerHTML = html;
+    });
 }
 
 btnRefreshNotif.addEventListener('click', syncNotifications);
