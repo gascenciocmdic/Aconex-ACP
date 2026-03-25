@@ -143,27 +143,35 @@ function renderTable() {
     tblCount.textContent = filtered.length;
 
     if (filtered.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-slate-500">No hay resultados para mostrar.</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="9" class="px-6 py-8 text-center text-slate-500">No hay resultados para mostrar.</td></tr>`;
         return;
     }
 
     let html = '';
     filtered.forEach(doc => {
-        // Formatear fecha si es posible
+        // Formatear fecha dd-mm-yyyy (Requerimiento Usuario)
         let displayDate = doc.modified_date;
-        try { if(displayDate.includes('T')) displayDate = new Date(displayDate).toLocaleDateString(); } catch(e){}
+        if (displayDate) {
+            const date = new Date(displayDate);
+            if (!isNaN(date)) {
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear();
+                displayDate = `${day}-${month}-${year}`;
+            }
+        }
 
         html += `
             <tr class="hover:bg-slate-800/80 transition-colors border-b border-slate-700/30">
-                <td class="px-6 py-4 font-mono text-xs text-brand">${doc.docno}</td>
+                <td class="px-6 py-4 font-mono text-xs text-brand font-bold">${doc.docno}</td>
                 <td class="px-6 py-4 truncate max-w-[200px]" title="${doc.title}">${doc.title}</td>
-                <td class="px-6 py-4 text-center font-semibold">${doc.revision}</td>
+                <td class="px-6 py-4 text-center font-semibold text-xs">${doc.revision}</td>
                 <td class="px-6 py-4">${getStatusBadge(doc.status)}</td>
-                <td class="px-6 py-4 text-xs text-slate-400">${displayDate}</td>
-                <td class="px-6 py-4 text-xs">${doc.specialty}</td>
-                <td class="px-6 py-4 text-xs text-slate-400 font-medium">${doc.author}</td>
-                <td class="px-6 py-4 text-xs font-mono text-slate-500">${doc.wbs}</td>
-                <td class="px-6 py-4 text-xs text-slate-400">${doc.contract}</td>
+                <td class="px-6 py-4 text-xs text-slate-400">${displayDate || 'N/A'}</td>
+                <td class="px-6 py-4 text-xs text-slate-300">${doc.author || 'N/A'}</td>
+                <td class="px-6 py-4 text-xs font-medium">${doc.specialty || 'General'}</td>
+                <td class="px-6 py-4 text-xs text-slate-400 italic">${doc.doc_type || 'N/A'}</td>
+                <td class="px-6 py-4 text-xs text-slate-400">${doc.contract || ''}</td>
             </tr>
         `;
     });
