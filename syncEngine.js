@@ -3,87 +3,89 @@ import AconexETLProcessor from './etlProcessor.js';
 
 class SyncEngine {
     constructor(dbPool, config) {
-        // En una UI local, dbPool representa la DB (ej. capa local que llama a SQLite, o simplemente memoria)
         this.db = dbPool;
         this.client = new AconexClient(config.projectId, config.username, config.password);
-    }
-
-    buildSearchPayload(pageNumber, pageSize = 500) {
-        return `<?xml version="1.0" encoding="UTF-8"?>
-<ProjectRegister>
-    <Search>
-        <search_type>PAGED</search_type>
-        <page_number>${pageNumber}</page_number>
-        <page_size>${pageSize}</page_size>
-    </Search>
-</ProjectRegister>`;
+        this.parser = new DOMParser();
     }
 
     parseTotalPages(xmlString) {
-        // MOCK para parsear el TotalPages del XML Aconex real
-        const match = xmlString.match(/<TotalPages>(\d+)<\/TotalPages>/i);
-        // Retornamos de 1 a 6 para simular la demo si no encuentra el tag real.
-        return match ? parseInt(match[1], 10) : 6; 
-    }
-
-    parseDocumentsFromXml(xmlString, pageNumber) {
-        // MOCK: Generador de datos Aconex de prueba para poblar el Frontend
-        const list = [];
-        for (let i = 1; i <= 50; i++) {
-            const num = (pageNumber * 100) + i;
-            const statuses = ["Aprobado", "En revisión", "Rechazado", "Anulado", "Cancelado"];
-            list.push({
-                docno: `DOC-2026-${num}`,
-                title: `Plano Arquitectónico ${num} - Proyecto Aconex`,
-                revision: ['A', 'B', '0C', 'D'][num % 4],
-                status: statuses[num % statuses.length], // Para ver los semáforos y filtros
-                modified_date: new Date().toISOString(),
-                contract: `CONT${num}-XYZ`, // Para ver regla 3
-                specialty: ['Arquitectura', 'Estructura', 'Eléctrica', 'Sanitaria'][num % 4],
-                author: `Arquitecto ${num % 3}`
-            });
+        try {
+            const xmlDoc = this.parser.parseFromString(xmlString, "text/xml");
+            const totalPagesNode = xmlDoc.querySelector('TotalPages');
+            return totalPagesNode ? parseInt(totalPagesNode.textContent, 10) : 1;
+        } catch (e) {
+            return 1;
         }
-        return list;
     }
 
-    // Callbacks passed from UI (El Orquestador manda eventos al DOM)
+    parseDocumentsFromXml(xmlString) {
+        const docs = [];
+        try {
+            const xmlDoc = this.parser.parseFromString(xmlString, "text/xml");
+            // Aconex suele devolver una lista de <ProjectRegisterData> o <Document>
+            const nodes = xmlDoc.querySelectorAll('ProjectRegisterData, Document');
+            
+            nodes.forEach(node => {
+                const getTxt = (selector) => node.querySelector(selector)?.textContent || '';
+                
+                docs.push({
+                    docno: getTxt('DocumentNo') || getTxt('DocumentNumber') || 'N/A',
+                    title: getTxt('Title') || 'Sin Título',
+                    revision: getTxt('Revision') || '0',
+                    status: getTxt('Status') || getTxt('DocumentStatus') || 'Desconocido',
+                    modified_date: getTxt('ModifiedDate') || new Date().toISOString(),
+                    wbs: getTxt('WBS') || '',
+                    specialty: getTxt('Specialty') || 'General',
+                    contract: getTxt('Contract') || getTxt('Attribute1') || '',
+                    author: getTxt('Author') || ''
+                });
+            });
+        } catch (e) {
+            console.error("Error parseando documentos:", e);
+        }
+        return docs;
+    }
+
     async syncAllData({ onStart, onProgress, onDocumentUpsert, onCircuitBreakerTrip, onFinish, onError }) {
         try {
             if (onStart) onStart();
 
-            const PAGE_SIZE = 50; // Mock menor tamaño para UI rapida
-            const payload = this.buildSearchPayload(1, PAGE_SIZE);
-            const initialXml = await this.client.fetchProjects(payload, onCircuitBreakerTrip);
-            
+            // Parámetros iniciales para la primera página
+            const params = {
+                search_type: 'PAGED',
+                page_size: 50,
+                page_number: 1
+            };
+
+            const initialXml = await this.client.fetchProjects(params, onCircuitBreakerTrip);
             const totalPages = this.parseTotalPages(initialXml);
-
-            // Proc 1
-            const rawDocs1 = this.parseDocumentsFromXml(initialXml, 1);
+            
+            // Procesar primera página
+            const rawDocs1 = this.parseDocumentsFromXml(initialXml);
             const curatedDocs1 = AconexETLProcessor.processDocuments(rawDocs1);
+            
             if (onProgress) onProgress(1, totalPages);
-            for (const doc of curatedDocs1) if (onDocumentUpsert) await onDocumentUpsert(doc);
+            for (const doc of curatedDocs1) {
+                if (onDocumentUpsert) await onDocumentUpsert(doc);
+            }
 
-            // Ciclo Paginas
+            // Ciclo de páginas restantes
             for (let page = 2; page <= totalPages; page++) {
-                try {
-                    // Simulamos delay del fetch
-                    await new Promise(r => setTimeout(r, 600));
+                if (this.client.isBlocked) break;
 
-                    const loopPayload = this.buildSearchPayload(page, PAGE_SIZE);
-                    const xmlResp = await this.client.fetchProjects(loopPayload, onCircuitBreakerTrip);
-                    
-                    const rawDocs = this.parseDocumentsFromXml(xmlResp, page);
-                    const curated = AconexETLProcessor.processDocuments(rawDocs);
-                    
-                    if (onProgress) onProgress(page, totalPages);
-                    for (const doc of curated) if (onDocumentUpsert) await onDocumentUpsert(doc);
-
-                } catch (pageErr) {
-                    console.warn(`Página ${page} errónea:`, pageErr);
-                    if (this.client.isBlocked) {
-                        throw new Error("Sentinel Blocked!"); // break everything
-                    }
+                const loopParams = { ...params, page_number: page };
+                const xmlResp = await this.client.fetchProjects(loopParams, onCircuitBreakerTrip);
+                
+                const rawDocs = this.parseDocumentsFromXml(xmlResp);
+                const curated = AconexETLProcessor.processDocuments(rawDocs);
+                
+                if (onProgress) onProgress(page, totalPages);
+                for (const doc of curated) {
+                    if (onDocumentUpsert) await onDocumentUpsert(doc);
                 }
+                
+                // Pequeña pausa para no saturar
+                await new Promise(r => setTimeout(r, 300));
             }
 
             if (onFinish) onFinish();

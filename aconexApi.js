@@ -13,11 +13,11 @@ class AconexClient {
     }
   
     /** Fetch core function with Sentinel Block Logic */
-    async fetchProjects(xmlPayload, onCircuitBreakerTrip) {
+    async fetchProjects(queryParams, onCircuitBreakerTrip) {
       if (this.isBlocked) {
         throw new Error("Sentinel Activo: Conexión Bloqueada. 2 fallos de Auth (401/403).");
       }
-      return this._executeFetch(xmlPayload, true, onCircuitBreakerTrip);
+      return this._executeFetch(queryParams, true, onCircuitBreakerTrip);
     }
 
     /** 
@@ -43,23 +43,25 @@ class AconexClient {
     }
 
     /** Helper function to execute requests to avoid code duplication */
-    async _executeFetch(xmlPayload, affectGlobalSentinel, onCircuitBreakerTrip) {
-        // En lugar de apuntar a https://us1.aconex.com directamente (lo cual bloquea el navegador por CORS)
-        // Apuntamos al proxy de Vercel. Ahora el proxy apunta a la raiz (https://us1.aconex.com/),
-        // por lo que debemos incluir /api/ manualmente aquí.
-        // Endpoint oficial de Super Search: /api/projects/{id}/register/search
-        const url = `/aconex-proxy/api/projects/${this.projectId}/register/search`;
-        const cleanPayload = this.cleanXmlString(xmlPayload);
+    async _executeFetch(params, affectGlobalSentinel, onCircuitBreakerTrip) {
+        // Usamos GET /api/projects/{id}/register con Query Params para máxima compatibilidad. 
+        // Aconex suele dar 405 (Method Not Allowed) en POST /register si el proyecto es estricto.
+        let url = `/aconex-proxy/api/projects/${this.projectId}/register`;
+        
+        // Si hay parámetros (como page_number), los añadimos a la URL
+        if (params && typeof params === 'object') {
+            const searchParams = new URLSearchParams(params);
+            url += `?${searchParams.toString()}`;
+        }
     
         try {
           const response = await fetch(url, {
-            method: 'POST',
+            method: 'GET',
             headers: {
-              'Content-Type': 'application/xml',
               'X-Application-Key': '827ccb23-a96e-4e49-be99-d7263c7a8ab4',
-              'Authorization': `Basic ${this.credentials}`
-            },
-            body: cleanPayload
+              'Authorization': `Basic ${this.credentials}`,
+              'Accept': 'application/xml'
+            }
           });
     
           if (!response.ok) {
