@@ -87,21 +87,13 @@ btnTestConn.addEventListener('click', async () => {
     btnTestConn.disabled = true;
 
     try {
-        // Ejecución segura que NO afecta el contador de Sentinel para extracción masiva (Phase 4 scope)
-        // Enviamos un request válido de tamaño 1 para testear auth sin que tire 405 (Method Not Allowed)
-        const validTestXml = `<?xml version="1.0" encoding="UTF-8"?>
-<ProjectRegister>
-    <Search>
-        <search_type>PAGED</search_type>
-        <page_number>1</page_number>
-        <page_size>1</page_size>
-    </Search>
-</ProjectRegister>`;
-        await tmpClient.testConnection(validTestXml);
+        // Ejecución SEGURA: Usamos el nuevo método GET /api/projects de AconexClient
+        // Esto valida si el Usuario/Pass/AppKey son correctos independientemente del Proyecto.
+        await tmpClient.testConnection();
         
         testResultContainer.classList.remove('hidden', 'bg-red-500/10', 'text-red-400', 'border-red-500/20');
         testResultContainer.classList.add('bg-green-500/10', 'text-green-400', 'border', 'border-green-500/20');
-        testResultContainer.innerHTML = `✅ Conexión exitosa a Aconex (${confProjectId.value})`;
+        testResultContainer.innerHTML = `✅ Autenticación exitosa. Credenciales válidas en Aconex (US1).`;
     } catch (e) {
         testResultContainer.classList.remove('hidden', 'bg-green-500/10', 'text-green-400', 'border-green-500/20');
         testResultContainer.classList.add('bg-red-500/10', 'text-red-400', 'border', 'border-red-500/20');
@@ -112,18 +104,18 @@ btnTestConn.addEventListener('click', async () => {
     }
 });
 
-btnTogglePass.addEventListener('click', () => {
-    // Forzamos la lógica de visualización con estilos directos por si Tailwind tiene conflictos
-    if (confPass.type === 'password') {
-        confPass.type = 'text';
-        iconEyeOpen.style.display = 'none';
-        iconEyeClosed.style.display = 'block';
-        iconEyeClosed.classList.remove('hidden'); // Aseguramos que la clase de Tailwind no bloquee
+btnTogglePass.addEventListener('click', (e) => {
+    e.preventDefault();
+    const type = confPass.getAttribute('type') === 'password' ? 'text' : 'password';
+    confPass.setAttribute('type', type);
+    
+    // Toggle iconos usando clases nativas de visibilidad
+    if (type === 'text') {
+        iconEyeOpen.classList.add('hidden');
+        iconEyeClosed.classList.remove('hidden');
     } else {
-        confPass.type = 'password';
-        iconEyeOpen.style.display = 'block';
         iconEyeOpen.classList.remove('hidden');
-        iconEyeClosed.style.display = 'none';
+        iconEyeClosed.classList.add('hidden');
     }
 });
 

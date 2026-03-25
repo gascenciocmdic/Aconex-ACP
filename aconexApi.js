@@ -21,13 +21,25 @@ class AconexClient {
     }
 
     /** 
-     * Función especial para testear la credencial en el Panel Admin sin disparar
-     * el contador global responsable de bloquear la cuenta por seguridad.
+     * Función especial para testear la credencial en el Panel Admin.
+     * Cambiamos a GET /api/projects porque es el endpoint más universal
+     * para validar credenciales (devuelve la lista de proyectos visibles).
      */
-    async testConnection(xmlPayload) {
-      // Ignoramos el bloqueado general para pruebas, pero tampoco aumentamos el contador general
-      // El 2do parámetro false evita que incremente fallos en el "Sentinel global".
-      return this._executeFetch(xmlPayload, false);
+    async testConnection() {
+        const url = `/aconex-proxy/api/projects`;
+        try {
+          const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+              'X-Application-Key': '827ccb23-a96e-4e49-be99-d7263c7a8ab4',
+              'Authorization': `Basic ${this.credentials}`
+            }
+          });
+          if (!response.ok) throw new Error(`Auth Error (${response.status})`);
+          return await response.text();
+        } catch (err) {
+          throw err;
+        }
     }
 
     /** Helper function to execute requests to avoid code duplication */
