@@ -84,7 +84,16 @@ btnTestConn.addEventListener('click', async () => {
 
     try {
         // Ejecución segura que NO afecta el contador de Sentinel para extracción masiva (Phase 4 scope)
-        await tmpClient.testConnection("<?xml version=\"1.0\"?><Ping></Ping>");
+        // Enviamos un request válido de tamaño 1 para testear auth sin que tire 405 (Method Not Allowed)
+        const validTestXml = `<?xml version="1.0" encoding="UTF-8"?>
+<ProjectRegister>
+    <Search>
+        <search_type>PAGED</search_type>
+        <page_number>1</page_number>
+        <page_size>1</page_size>
+    </Search>
+</ProjectRegister>`;
+        await tmpClient.testConnection(validTestXml);
         
         testResultContainer.classList.remove('hidden', 'bg-red-500/10', 'text-red-400', 'border-red-500/20');
         testResultContainer.classList.add('bg-green-500/10', 'text-green-400', 'border', 'border-green-500/20');
