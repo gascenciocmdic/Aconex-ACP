@@ -5,6 +5,22 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/aconex-proxy/us1/:path*",
+      "destination": "https://us1.aconex.com/:path*"
+    },
+    {
+      "source": "/aconex-proxy/au1/:path*",
+      "destination": "https://au1.aconex.com/:path*"
+    },
+    {
+      "source": "/aconex-proxy/uk1/:path*",
+      "destination": "https://uk1.aconex.com/:path*"
+    },
+    {
+      "source": "/aconex-proxy/eu1/:path*",
+      "destination": "https://eu1.aconex.com/:path*"
+    },
+    {
       "source": "/aconex-proxy/:path*",
       "destination": "https://us1.aconex.com/:path*"
     }

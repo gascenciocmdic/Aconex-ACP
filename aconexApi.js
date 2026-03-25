@@ -1,7 +1,8 @@
 class AconexClient {
-    constructor(projectId, user, pass) {
+    constructor(projectId, user, pass, region = 'us1') {
       this.projectId = projectId;
       this.credentials = btoa(`${user}:${pass}`);
+      this.region = region.toLowerCase();
       this.failedAttempts = 0;
       this.isBlocked = false; // Sentinel lock
     }
@@ -26,7 +27,7 @@ class AconexClient {
      * para validar credenciales (devuelve la lista de proyectos visibles).
      */
     async testConnection() {
-        const url = `/aconex-proxy/api/projects`;
+        const url = `/aconex-proxy/${this.region}/api/projects`;
         try {
           const response = await fetch(url, {
             method: 'GET',
@@ -46,7 +47,7 @@ class AconexClient {
     async _executeFetch(params, affectGlobalSentinel, onCircuitBreakerTrip) {
         // Usamos GET /api/projects/{id}/register con Query Params para máxima compatibilidad. 
         // Aconex suele dar 405 (Method Not Allowed) en POST /register si el proyecto es estricto.
-        let url = `/aconex-proxy/api/projects/${this.projectId}/register`;
+        let url = `/aconex-proxy/${this.region}/api/projects/${this.projectId}/register`;
         
         // Parámetros exactos de Power Query del usuario
         const defaultParams = {
@@ -82,17 +83,18 @@ class AconexClient {
             }
             throw new Error(`Aconex Error: ${response.status}`);
           }
-    
           if (affectGlobalSentinel) this.failedAttempts = 0; // Reset
           return await response.text(); 
-
         } catch (err) {
           throw err;
         }
     }
 
+    /** 
+     * Método para consultar correo de proyecto (Project Mail API).
+     */
     async fetchMail(params = {}) {
-        let url = `/aconex-proxy/api/projects/${this.projectId}/mail`;
+        let url = `/aconex-proxy/${this.region}/api/projects/${this.projectId}/mail`;
         const searchParams = new URLSearchParams(params);
         url += `?${searchParams.toString()}`;
 
@@ -112,5 +114,5 @@ class AconexClient {
         }
     }
 }
-  
+
 export default AconexClient;

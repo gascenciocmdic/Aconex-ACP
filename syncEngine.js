@@ -4,7 +4,7 @@ import AconexETLProcessor from './etlProcessor.js';
 class SyncEngine {
     constructor(dbPool, config) {
         this.db = dbPool;
-        this.client = new AconexClient(config.projectId, config.username, config.password);
+        this.client = new AconexClient(config.projectId, config.username, config.password, config.region || 'us1');
         this.parser = new DOMParser();
     }
 

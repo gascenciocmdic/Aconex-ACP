@@ -9,6 +9,7 @@ const views = document.querySelectorAll('.view-section');
 const adminForm = document.getElementById('adminForm');
 const confAppKey = document.getElementById('confAppKey');
 const confProjectId = document.getElementById('confProjectId');
+const confRegion = document.getElementById('confRegion');
 const confFilterName = document.getElementById('confFilterName');
 const confUser = document.getElementById('confUser');
 const confPass = document.getElementById('confPass');
@@ -54,6 +55,7 @@ let localTransmittalsDB = [];
 let isSyncing = false;
 let globalConfig = {
     projectId: confProjectId.value,
+    region: confRegion.value,
     username: '',
     password: ''
 };
@@ -95,6 +97,7 @@ tabs.forEach(tab => {
 adminForm.addEventListener('submit', (e) => {
     e.preventDefault();
     globalConfig.projectId = confProjectId.value.trim();
+    globalConfig.region = confRegion.value;
     globalConfig.username = confUser.value.trim();
     globalConfig.password = confPass.value.trim();
     
@@ -106,7 +109,8 @@ btnTestConn.addEventListener('click', async () => {
     const tmpClient = new AconexClient(
         confProjectId.value.trim(),
         confUser.value.trim(),
-        confPass.value.trim()
+        confPass.value.trim(),
+        confRegion.value
     );
 
     btnTestConn.innerHTML = `<span class="animate-spin inline-block w-4 h-4 border-2 border-slate-500 border-t-white rounded-full"></span> Probando...`;
@@ -115,7 +119,7 @@ btnTestConn.addEventListener('click', async () => {
     try {
         await tmpClient.testConnection();
         testResultContainer.className = 'mt-4 p-3 rounded-lg text-sm text-center font-medium bg-green-500/10 text-green-400 border border-green-500/20';
-        testResultContainer.innerHTML = `✅ Autenticación exitosa. Credenciales válidas en Aconex (US1).`;
+        testResultContainer.innerHTML = `✅ Autenticación exitosa. Credenciales válidas en Aconex (${confRegion.value.toUpperCase()}).`;
         testResultContainer.classList.remove('hidden');
     } catch (e) {
         testResultContainer.className = 'mt-4 p-3 rounded-lg text-sm text-center font-medium bg-red-500/10 text-red-400 border border-red-500/20';
@@ -319,6 +323,7 @@ document.querySelectorAll('th[data-sort-trans]').forEach(th => {
 async function syncNotifications() {
     // Aseguramos que los valores estén actualizados desde el form (o Admin Panel)
     globalConfig.projectId = confProjectId.value.trim();
+    globalConfig.region = confRegion.value;
     globalConfig.username = confUser.value.trim();
     globalConfig.password = confPass.value.trim();
 
@@ -337,7 +342,11 @@ async function syncNotifications() {
     
     const engine = new SyncEngine(null, globalConfig);
     try {
-        localTransmittalsDB = await engine.syncAllTransmittals();
+        const xml = await engine.client.fetchMail({ mail_box: 'Inbox', search_query: 'mailtype:Transmittal' });
+        // Volcamos al log técnico para depuración
+        if (techLog) techLog.value += `\n--- DEBUG TRANSMITTAL XML ---\n${xml}\n`;
+        
+        localTransmittalsDB = engine.parseTransmittalsFromXml(xml);
         updateTransFilterOptions();
         renderNotifications();
         
@@ -432,6 +441,7 @@ btnStartSync.addEventListener('click', async () => {
     if (isSyncing) return;
     
     globalConfig.projectId = confProjectId.value.trim();
+    globalConfig.region = confRegion.value;
     globalConfig.username = confUser.value.trim();
     globalConfig.password = confPass.value.trim();
 
