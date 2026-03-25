@@ -148,14 +148,21 @@ function renderTable() {
 
     let html = '';
     filtered.forEach(doc => {
+        // Formatear fecha si es posible
+        let displayDate = doc.modified_date;
+        try { if(displayDate.includes('T')) displayDate = new Date(displayDate).toLocaleDateString(); } catch(e){}
+
         html += `
-            <tr class="hover:bg-slate-800/80 transition-colors">
-                <td class="px-6 py-4 font-mono text-brand">${doc.docno}</td>
-                <td class="px-6 py-4 truncate max-w-xs" title="${doc.title}">${doc.title}</td>
-                <td class="px-6 py-4 font-semibold">${doc.revision}</td>
+            <tr class="hover:bg-slate-800/80 transition-colors border-b border-slate-700/30">
+                <td class="px-6 py-4 font-mono text-xs text-brand">${doc.docno}</td>
+                <td class="px-6 py-4 truncate max-w-[200px]" title="${doc.title}">${doc.title}</td>
+                <td class="px-6 py-4 text-center font-semibold">${doc.revision}</td>
                 <td class="px-6 py-4">${getStatusBadge(doc.status)}</td>
-                <td class="px-6 py-4">${doc.specialty}</td>
-                <td class="px-6 py-4 text-slate-400">${doc.contract}</td>
+                <td class="px-6 py-4 text-xs text-slate-400">${displayDate}</td>
+                <td class="px-6 py-4 text-xs">${doc.specialty}</td>
+                <td class="px-6 py-4 text-xs text-slate-400 font-medium">${doc.author}</td>
+                <td class="px-6 py-4 text-xs font-mono text-slate-500">${doc.wbs}</td>
+                <td class="px-6 py-4 text-xs text-slate-400">${doc.contract}</td>
             </tr>
         `;
     });

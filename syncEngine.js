@@ -22,26 +22,34 @@ class SyncEngine {
         const docs = [];
         try {
             const xmlDoc = this.parser.parseFromString(xmlString, "text/xml");
-            // Aconex suele devolver una lista de <ProjectRegisterData> o <Document>
+            // Aconex usa ProjectRegisterData para búsquedas Super Search o lista de Document
             const nodes = xmlDoc.querySelectorAll('ProjectRegisterData, Document');
             
             nodes.forEach(node => {
-                const getTxt = (selector) => node.querySelector(selector)?.textContent || '';
+                const getTxt = (selectors) => {
+                    for (const s of selectors) {
+                        const el = node.querySelector(s);
+                        if (el && el.textContent.trim()) return el.textContent.trim();
+                    }
+                    return '';
+                };
                 
+                // Mapeo robusto: Aconex varía nombres según servicio (DocumentNumber vs DocumentNo)
                 docs.push({
-                    docno: getTxt('DocumentNo') || getTxt('DocumentNumber') || 'N/A',
-                    title: getTxt('Title') || 'Sin Título',
-                    revision: getTxt('Revision') || '0',
-                    status: getTxt('Status') || getTxt('DocumentStatus') || 'Desconocido',
-                    modified_date: getTxt('ModifiedDate') || new Date().toISOString(),
-                    wbs: getTxt('WBS') || '',
-                    specialty: getTxt('Specialty') || 'General',
-                    contract: getTxt('Contract') || getTxt('Attribute1') || '',
-                    author: getTxt('Author') || ''
+                    docno: getTxt(['DocumentNo', 'DocumentNumber', 'DocumentID']),
+                    title: getTxt(['Title', 'DocumentTitle', 'Subject']),
+                    revision: getTxt(['Revision', 'DocumentRevision', 'Rev']),
+                    status: getTxt(['Status', 'DocumentStatus', 'CurrentStatus']),
+                    modified_date: getTxt(['ModifiedDate', 'Modified', 'LastModified']),
+                    wbs: getTxt(['WBS', 'WorkPackage', 'WBS_Code']),
+                    specialty: getTxt(['Specialty', 'Disc', 'Discipline']),
+                    // Contract suele estar en atributos personalizados Attr1-50 o campos específicos
+                    contract: getTxt(['Contract', 'Attribute1', 'Attr1', 'ContractNumber']),
+                    author: getTxt(['Author', 'CreatedBy', 'Originator'])
                 });
             });
         } catch (e) {
-            console.error("Error parseando documentos:", e);
+            console.error("Error crítico parseando XML Aconex:", e);
         }
         return docs;
     }
@@ -50,10 +58,10 @@ class SyncEngine {
         try {
             if (onStart) onStart();
 
-            // Parámetros iniciales para la primera página
+            // Paginación establecida para un máximo de 500 registros por página (Restricción Aconex)
             const params = {
                 search_type: 'PAGED',
-                page_size: 50,
+                page_size: 500,
                 page_number: 1
             };
 
@@ -84,8 +92,8 @@ class SyncEngine {
                     if (onDocumentUpsert) await onDocumentUpsert(doc);
                 }
                 
-                // Pequeña pausa para no saturar
-                await new Promise(r => setTimeout(r, 300));
+                // Pausa de cortesía para no saturar el servidor
+                await new Promise(r => setTimeout(r, 400));
             }
 
             if (onFinish) onFinish();
