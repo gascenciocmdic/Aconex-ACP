@@ -175,6 +175,7 @@ class SyncEngine {
             do {
                 const params = { 
                     mail_box: 'Inbox', 
+                    search_type: 'PAGED',
                     start_row: startRow 
                 };
                 if (status) params.status = status;
