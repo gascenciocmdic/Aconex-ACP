@@ -8,6 +8,19 @@ class SyncEngine {
         this.parser = new DOMParser();
     }
 
+    parseMailSearchMetadata(xmlString) {
+        try {
+            const xmlDoc = this.parser.parseFromString(xmlString, "text/xml");
+            const root = xmlDoc.documentElement;
+            return {
+                totalResults: parseInt(root.getAttribute('TotalResults') || '0', 10),
+                onPage: parseInt(root.getAttribute('TotalResultsOnPage') || '0', 10)
+            };
+        } catch (e) {
+            return { totalResults: 0, onPage: 0 };
+        }
+    }
+
     parseTotalPages(xmlString) {
         try {
             const xmlDoc = this.parser.parseFromString(xmlString, "text/xml");
@@ -150,37 +163,60 @@ class SyncEngine {
     }
 
     async syncAllTransmittals(options = {}) {
-        const { onProgress } = options;
+        const { onProgress, status } = options;
         try {
-            // Paso 1: Obtener la lista de MailIds
-            const params = { mail_box: 'Inbox' };
-            const xmlList = await this.client.fetchMail(params);
-            const headers = this.parseTransmittalsFromXml(xmlList);
-            
-            if (headers.length === 0) return [];
+            const allHeaders = [];
+            let startRow = 1;
+            let totalResults = 0;
+            const pageSize = 250;
+
+            if (onProgress) onProgress(0, 0, "Buscando cabeceras...");
+
+            do {
+                const params = { 
+                    mail_box: 'Inbox', 
+                    start_row: startRow 
+                };
+                if (status) params.status = status;
+
+                const xmlList = await this.client.fetchMail(params);
+                const metadata = this.parseMailSearchMetadata(xmlList);
+                totalResults = metadata.totalResults;
+
+                const headers = this.parseTransmittalsFromXml(xmlList);
+                allHeaders.push(...headers);
+
+                if (onProgress) onProgress(0, 0, `Obtenidas ${allHeaders.length} de ${totalResults} cabeceras...`);
+                
+                startRow += pageSize;
+                // Pequeño delay entre páginas de búsqueda
+                if (startRow <= totalResults) await new Promise(r => setTimeout(r, 200));
+
+            } while (startRow <= totalResults);
+
+            if (allHeaders.length === 0) return [];
             
             const fullDetails = [];
-            const total = headers.length;
+            const total = allHeaders.length;
             
             // Paso 2: Obtener el detalle de CADA CORREO
-            // Para no saturar la API, procesaremos por lotes pequeños
             for (let i = 0; i < total; i++) {
-                const header = headers[i];
+                const header = allHeaders[i];
                 try {
                     const xmlDetail = await this.client.fetchMailDetail(header.id);
                     const parsed = this.parseTransmittalsFromXml(xmlDetail);
                     if (parsed.length > 0) {
                         fullDetails.push(parsed[0]);
+                    } else {
+                        fullDetails.push(header);
                     }
                 } catch (e) {
-                    console.error(`Error descargando detalle de Mail ${header.id}:`, e);
-                    // Si falla el detalle, guardamos al menos el encabezado con S/N
                     fullDetails.push(header);
                 }
 
-                if (onProgress) onProgress(i + 1, total);
+                if (onProgress) onProgress(i + 1, total, `Descargando detalles: ${i+1}/${total}`);
                 
-                // Pequeña pausa para ser respetuosos con la API
+                // Pausa cada X registros para evitar 429
                 if (i % 5 === 0) await new Promise(r => setTimeout(r, 100));
             }
 

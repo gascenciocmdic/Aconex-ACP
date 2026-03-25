@@ -11,8 +11,6 @@ const confAppKey = document.getElementById('confAppKey');
 const confProjectId = document.getElementById('confProjectId');
 const confRegion = document.getElementById('confRegion');
 const confFilterName = document.getElementById('confFilterName');
-const filterTransRecipient = document.getElementById('filterTransRecipient');
-const filterTransStatus = document.getElementById('filterTransStatus');
 const confUser = document.getElementById('confUser');
 const confPass = document.getElementById('confPass');
 const btnTogglePass = document.getElementById('btnTogglePass');
@@ -49,6 +47,9 @@ const btnRefreshNotif = document.getElementById('btnRefreshNotif');
 const filterTransSearch = document.getElementById('filterTransSearch');
 const filterTransUser = document.getElementById('filterTransUser');
 const filterTransOrg = document.getElementById('filterTransOrg');
+const filterTransRecipient = document.getElementById('filterTransRecipient');
+const filterTransStatus = document.getElementById('filterTransStatus');
+const filterTransUnread = document.getElementById('filterTransUnread');
 const transCount = document.getElementById('transCount');
 
 // State
@@ -344,13 +345,19 @@ async function syncNotifications() {
     
     const engine = new SyncEngine(null, globalConfig);
     try {
-        // Nuevo flujo: Sincronización en dos pasos con progreso
-        localTransmittalsDB = await engine.syncAllTransmittals({
-            onProgress: (done, total) => {
-                notifTableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-slate-500 italic"><span class="animate-pulse">Descargando detalles... ${done} de ${total}</span></td></tr>`;
-                if (techLog && done % 5 === 0) techLog.value += `\rSincronizando: ${done}/${total}...`;
+        const syncOptions = {
+            onProgress: (done, total, msg) => {
+                const displayMsg = msg || `Descargando detalles... ${done} de ${total}`;
+                notifTableBody.innerHTML = `<tr><td colspan="7" class="px-6 py-12 text-center text-slate-500 italic"><span class="animate-pulse">${displayMsg}</span></td></tr>`;
+                if (techLog) techLog.value += `\r[SYNC] ${displayMsg}`;
             }
-        });
+        };
+        
+        if (filterTransUnread && filterTransUnread.checked) {
+            syncOptions.status = 'Unread';
+        }
+
+        localTransmittalsDB = await engine.syncAllTransmittals(syncOptions);
 
         updateTransFilterOptions();
         renderNotifications();
