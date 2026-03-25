@@ -78,6 +78,51 @@ class SyncEngine {
         return docs;
     }
 
+    parseTransmittalsFromXml(xmlString) {
+        const transmittals = [];
+        try {
+            const xmlDoc = this.parser.parseFromString(xmlString, "text/xml");
+            const items = xmlDoc.querySelectorAll('MailItem');
+            
+            items.forEach(item => {
+                const getVal = (selector) => {
+                    const el = item.querySelector(selector);
+                    return el ? el.textContent.trim() : '';
+                };
+
+                transmittals.push({
+                    id: getVal('MailId'),
+                    subject: getVal('Subject'),
+                    fromUser: getVal('From > User'),
+                    fromOrg: getVal('From > Organization'),
+                    date: getVal('DateSent'),
+                    isUnread: true
+                });
+            });
+        } catch (e) {
+            console.error("Error parseando Transmittals:", e);
+        }
+        return transmittals;
+    }
+
+    async syncUnreadTransmittals(onFinished) {
+        try {
+            // mail_type_id=-2 suele ser Transmittal en Aconex. 
+            // unread=true filtra solo los no leídos.
+            const params = {
+                mail_type_id: -2,
+                unread: 'true'
+            };
+            const xml = await this.client.fetchMail(params);
+            const list = this.parseTransmittalsFromXml(xml);
+            if (onFinished) onFinished(list);
+            return list;
+        } catch (e) {
+            console.error("Error sincronizando notificaciones:", e);
+            return [];
+        }
+    }
+
     async syncAllData({ onStart, onProgress, onDocumentUpsert, onCircuitBreakerTrip, onFinish, onError, onRawResponse, pageSize = 200 }) {
         try {
             if (onStart) onStart();

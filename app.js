@@ -19,6 +19,7 @@ const iconEyeClosed = document.getElementById('iconEyeClosed');
 const techLog = document.getElementById('techLog');
 const testResultContainer = document.getElementById('testResultContainer');
 const btnTestConn = document.getElementById('btnTestConn');
+const notifBadge = document.getElementById('notifBadge');
 
 // Dashboard UI
 const btnStartSync = document.getElementById('btnStartSync');
@@ -38,6 +39,10 @@ const filterRev = document.getElementById('filterRev');
 const filterDocType = document.getElementById('filterDocType');
 const filterSpecialty = document.getElementById('filterSpecialty');
 const confPageSize = document.getElementById('confPageSize');
+
+// Notification UI
+const notifTableBody = document.getElementById('notifTableBody');
+const btnRefreshNotif = document.getElementById('btnRefreshNotif');
 
 // State
 let localDB = []; 
@@ -65,6 +70,7 @@ tabs.forEach(tab => {
             if (v.id === `view-${target}`) {
                 v.classList.remove('hidden');
                 v.classList.add('active');
+                if (target === 'notificaciones') syncNotifications();
             } else {
                 v.classList.add('hidden');
                 v.classList.remove('active');
@@ -265,7 +271,57 @@ function updateFilterOptions() {
 }
 
 // ======================================
-// 4. Synchronization Orchestration
+// 4. Notifications Engine
+// ======================================
+async function syncNotifications() {
+    if (!globalConfig.username || !globalConfig.password) return;
+    
+    notifTableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-slate-500 italic"><span class="animate-pulse">Consultando Inbox de Aconex...</span></td></tr>`;
+    
+    const engine = new SyncEngine(null, globalConfig);
+    try {
+        const transmittals = await engine.syncUnreadTransmittals();
+        renderNotifications(transmittals);
+        
+        // Update Badge
+        if (transmittals.length > 0) {
+            notifBadge.classList.remove('hidden');
+            notifBadge.textContent = transmittals.length; // Si quisiéramos texto, pero es un punto rojo
+        } else {
+            notifBadge.classList.add('hidden');
+        }
+    } catch (e) {
+        notifTableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-red-500 border border-red-500/20 bg-red-500/5">Error: ${e.message}</td></tr>`;
+    }
+}
+
+function renderNotifications(items) {
+    if (items.length === 0) {
+        notifTableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-slate-500 italic">No tienes Transmittals pendientes por leer.</td></tr>`;
+        return;
+    }
+
+    let html = '';
+    items.forEach(item => {
+        let displayDate = item.date;
+        try { displayDate = new Date(item.date).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }); } catch(e){}
+
+        html += `
+            <tr class="hover:bg-slate-800/80 transition-colors border-b border-slate-700/30">
+                <td class="px-6 py-4 font-semibold text-slate-200">${item.fromUser}</td>
+                <td class="px-6 py-4 text-xs text-slate-400">${item.fromOrg}</td>
+                <td class="px-6 py-4 font-medium text-brand truncate max-w-sm" title="${item.subject}">${item.subject}</td>
+                <td class="px-6 py-4 text-xs text-slate-500">${displayDate}</td>
+            </tr>
+        `;
+    });
+    notifTableBody.innerHTML = html;
+}
+
+btnRefreshNotif.addEventListener('click', syncNotifications);
+
+// ======================================
+// 5. Synchronization Orchestration
 // ======================================
 btnStartSync.addEventListener('click', async () => {
     if (isSyncing) return;
