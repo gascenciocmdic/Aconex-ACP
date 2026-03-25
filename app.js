@@ -16,6 +16,7 @@ const btnTogglePass = document.getElementById('btnTogglePass');
 // Seleccionamos ambos iconos para el toggle
 const iconEyeOpen = document.getElementById('iconEyeOpen');
 const iconEyeClosed = document.getElementById('iconEyeClosed');
+const techLog = document.getElementById('techLog');
 const testResultContainer = document.getElementById('testResultContainer');
 const btnTestConn = document.getElementById('btnTestConn');
 
@@ -226,6 +227,10 @@ btnStartSync.addEventListener('click', async () => {
                 else localDB.push(doc);
 
                 if (doc.specialty) specialtiesSet.add(doc.specialty);
+            },
+            onRawResponse: (xml) => {
+                if (techLog) techLog.value = xml;
+                console.log("Aconex Raw XML:", xml);
             },
             onCircuitBreakerTrip: () => {
                 // UI Event handling when Sentinel activates

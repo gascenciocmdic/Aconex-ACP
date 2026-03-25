@@ -22,28 +22,41 @@ class SyncEngine {
         const docs = [];
         try {
             const xmlDoc = this.parser.parseFromString(xmlString, "text/xml");
-            // Aconex usa ProjectRegisterData para búsquedas Super Search o lista de Document
-            const nodes = xmlDoc.querySelectorAll('ProjectRegisterData, Document');
             
-            nodes.forEach(node => {
+            // Estrategia Ultra-Robusta: Buscamos cualquier elemento que actúe como "contenedor" de un documento.
+            // En Aconex esto puede ser <Document>, <ProjectRegisterData>, <DocumentRegister>, etc.
+            // Identificamos el nodo si tiene un hijo que parezca un DocumentNo.
+            const allElements = xmlDoc.getElementsByTagName('*');
+            const documentNodes = [];
+            
+            for (let i = 0; i < allElements.length; i++) {
+                const el = allElements[i];
+                // Si el elemento tiene un hijo llamado DocumentNo o DocumentNumber, es un candidato a Fila.
+                const hasDocId = el.querySelector('DocumentNo, DocumentNumber, DocumentID, Document_Number');
+                if (hasDocId && !documentNodes.some(n => n.contains(el))) {
+                    documentNodes.push(el);
+                }
+            }
+
+            documentNodes.forEach(node => {
                 const getTxt = (selectors) => {
                     for (const s of selectors) {
-                        const el = node.querySelector(s);
+                        // Buscamos tanto con selector normal como con el nombre base (para soportar namespaces)
+                        const el = node.querySelector(s) || 
+                                   Array.from(node.children).find(c => c.nodeName.split(':').pop() === s);
                         if (el && el.textContent.trim()) return el.textContent.trim();
                     }
                     return '';
                 };
                 
-                // Mapeo robusto: Aconex varía nombres según servicio (DocumentNumber vs DocumentNo)
                 docs.push({
-                    docno: getTxt(['DocumentNo', 'DocumentNumber', 'DocumentID']),
-                    title: getTxt(['Title', 'DocumentTitle', 'Subject']),
-                    revision: getTxt(['Revision', 'DocumentRevision', 'Rev']),
-                    status: getTxt(['Status', 'DocumentStatus', 'CurrentStatus']),
-                    modified_date: getTxt(['ModifiedDate', 'Modified', 'LastModified']),
+                    docno: getTxt(['DocumentNo', 'DocumentNumber', 'DocumentID', 'Document_Number']),
+                    title: getTxt(['Title', 'DocumentTitle', 'Subject', 'Document_Title']),
+                    revision: getTxt(['Revision', 'DocumentRevision', 'Rev', 'Document_Revision']),
+                    status: getTxt(['Status', 'DocumentStatus', 'CurrentStatus', 'Document_Status']),
+                    modified_date: getTxt(['ModifiedDate', 'Modified', 'LastModified', 'Modified_Date']),
                     wbs: getTxt(['WBS', 'WorkPackage', 'WBS_Code']),
                     specialty: getTxt(['Specialty', 'Disc', 'Discipline']),
-                    // Contract suele estar en atributos personalizados Attr1-50 o campos específicos
                     contract: getTxt(['Contract', 'Attribute1', 'Attr1', 'ContractNumber']),
                     author: getTxt(['Author', 'CreatedBy', 'Originator'])
                 });
@@ -54,7 +67,7 @@ class SyncEngine {
         return docs;
     }
 
-    async syncAllData({ onStart, onProgress, onDocumentUpsert, onCircuitBreakerTrip, onFinish, onError }) {
+    async syncAllData({ onStart, onProgress, onDocumentUpsert, onCircuitBreakerTrip, onFinish, onError, onRawResponse }) {
         try {
             if (onStart) onStart();
 
@@ -66,6 +79,7 @@ class SyncEngine {
             };
 
             const initialXml = await this.client.fetchProjects(params, onCircuitBreakerTrip);
+            if (onRawResponse) onRawResponse(initialXml); // Para depuración
             const totalPages = this.parseTotalPages(initialXml);
             
             // Procesar primera página
