@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aconex Pro Dashboard</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0f172a',
+                        darkcard: '#1e293b',
+                        brand: '#3b82f6',
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-darkbg text-slate-200 font-sans min-h-screen flex flex-col antialiased selection:bg-brand selection:text-white">
+    
+    <!-- Background Effects -->
+    <div class="fixed inset-0 z-[-1] overflow-hidden pointer-events-none">
+        <div class="absolute top-[-20%] left-[-10%] w-[70vw] h-[70vw] rounded-full bg-brand/10 blur-[120px]"></div>
+        <div class="absolute bottom-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-purple-500/10 blur-[100px]"></div>
+    </div>
+
+    <!-- Top Navigation -->
+    <nav class="sticky top-0 z-50 backdrop-blur-md bg-darkbg/80 border-b border-slate-700/50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg flex items-center justify-center font-bold text-white">A</div>
+                    <span class="text-xl font-bold tracking-tight text-white">Aconex<span class="text-brand">Panel</span></span>
+                </div>
+                <div class="flex space-x-1">
+                    <button class="nav-tab active px-4 py-2 rounded-md text-sm font-medium transition-colors" data-target="dashboard">Dashboard</button>
+                    <button class="nav-tab px-4 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-white transition-colors flex items-center gap-2" data-target="admin">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        Admin
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        
+        <!-- ======================= -->
+        <!-- DASHBOARD VIEW          -->
+        <!-- ======================= -->
+        <div id="view-dashboard" class="view-section active animate-fade-in">
+            <!-- Header & Sync Actions -->
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-white">Documentos Aconex</h2>
+                    <p class="text-slate-400 text-sm mt-1">Datos extraídos mediante la orquestación masiva y ETL.</p>
+                </div>
+
+                <div class="flex flex-col items-end w-full md:w-auto gap-2">
+                    <button id="btnStartSync" class="bg-brand hover:bg-blue-600 text-white px-6 py-2.5 rounded-lg font-medium shadow-lg shadow-brand/20 transition-all active:scale-95 flex items-center justify-center min-w-[200px]">
+                        <span>Extraer Masivamente</span>
+                    </button>
+                    <!-- Progress Bar Wrap -->
+                    <div id="progressContainer" class="hidden w-full min-w-[200px] flex-col gap-1">
+                        <div class="flex justify-between text-xs font-semibold text-slate-300">
+                            <span id="progressText">Página 0 de 0</span>
+                            <span id="progressPercent">0%</span>
+                        </div>
+                        <div class="w-full bg-slate-700 rounded-full h-2">
+                            <div id="progressBar" class="bg-brand rounded-full h-2 transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Circuit Breaker Status Banner -->
+            <div id="circuitBanner" class="hidden mb-6 bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex items-center gap-3">
+                <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                <span class="text-red-400 font-medium">Sincronización Bloqueada: El Circuit Breaker (Sentinel) detuvo la extracción debido a 2 fallos consecutivos de autenticación. Revisa el Panel Admin.</span>
+            </div>
+
+            <!-- Filters -->
+            <div class="glass-card mb-6 p-4 rounded-xl flex flex-col md:flex-row gap-4 items-center">
+                <div class="relative w-full md:w-1/3">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    </div>
+                    <input type="text" id="filterSearch" placeholder="Buscar por Título o DocNo..." class="block w-full pl-10 bg-slate-800/50 border border-slate-600 rounded-lg py-2 focus:ring-2 focus:ring-brand focus:border-brand transition-all text-white placeholder-slate-400">
+                </div>
+                
+                <div class="w-full md:w-1/4">
+                    <select id="filterSpecialty" class="block w-full bg-slate-800/50 border border-slate-600 rounded-lg py-2 px-3 focus:ring-2 focus:ring-brand focus:border-brand text-white appearance-none">
+                        <option value="">Todas las Especialidades</option>
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+                
+                <div class="text-slate-400 text-sm ml-auto font-medium">
+                    Total: <span id="tblCount" class="text-white">0</span> docs
+                </div>
+            </div>
+
+            <!-- Data Table -->
+            <div class="glass-card rounded-xl overflow-hidden border border-slate-700/50">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm whitespace-nowrap">
+                        <thead class="bg-slate-800/50 text-slate-300 uppercase text-xs font-semibold tracking-wider">
+                            <tr>
+                                <th class="px-6 py-4">Doc No.</th>
+                                <th class="px-6 py-4">Título</th>
+                                <th class="px-6 py-4">Rev</th>
+                                <th class="px-6 py-4">Status</th>
+                                <th class="px-6 py-4">Specialty</th>
+                                <th class="px-6 py-4">Contract</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody" class="divide-y divide-slate-700/50 text-slate-300">
+                            <!-- Table rows will be rendered here -->
+                            <tr>
+                                <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                                    Aún no hay documentos en la base de datos local. Ejecuta la sincronización masiva.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================= -->
+        <!-- ADMIN PANEL VIEW        -->
+        <!-- ======================= -->
+        <div id="view-admin" class="view-section hidden animate-fade-in max-w-3xl mx-auto">
+            <h2 class="text-2xl font-bold text-white mb-6">Configuración del Sistema</h2>
+            
+            <div class="glass-card rounded-xl p-8 border border-slate-700/50">
+                <form id="adminForm" class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-1">App Key</label>
+                        <input type="text" id="confAppKey" value="827ccb23-a96e-4e49-be99-d7263c7a8ab4" class="block w-full bg-slate-800/80 border border-slate-600 rounded-lg py-2.5 px-3 focus:ring-2 focus:ring-brand text-white font-mono text-sm">
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-1">Project ID</label>
+                            <input type="text" id="confProjectId" value="12345678" class="block w-full bg-slate-800/80 border border-slate-600 rounded-lg py-2.5 px-3 focus:ring-2 focus:ring-brand text-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-1">Filtro de Nombre (Opcional)</label>
+                            <input type="text" id="confFilterName" placeholder="Ej: Reportes" class="block w-full bg-slate-800/80 border border-slate-600 rounded-lg py-2.5 px-3 focus:ring-2 focus:ring-brand text-white">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-1">Usuario Auth Basic</label>
+                            <input type="text" id="confUser" placeholder="tu_usuario" class="block w-full bg-slate-800/80 border border-slate-600 rounded-lg py-2.5 px-3 focus:ring-2 focus:ring-brand text-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-1">Contraseña Auth Basic</label>
+                            <input type="password" id="confPass" placeholder="••••••••" class="block w-full bg-slate-800/80 border border-slate-600 rounded-lg py-2.5 px-3 focus:ring-2 focus:ring-brand text-white">
+                        </div>
+                    </div>
+
+                    <div class="pt-6 border-t border-slate-700/50 flex flex-col md:flex-row justify-between items-center gap-4">
+                        <button type="button" id="btnTestConn" class="w-full md:w-auto px-6 py-2.5 rounded-lg font-medium border border-slate-600 hover:bg-slate-700 hover:text-white transition-colors flex items-center justify-center gap-2">
+                            <span>Test Connection</span>
+                        </button>
+                        
+                        <button type="submit" class="w-full md:w-auto bg-brand hover:bg-blue-600 text-white px-8 py-2.5 rounded-lg font-medium shadow-lg transition-colors">
+                            Guardar Configuración
+                        </button>
+                    </div>
+
+                    <!-- Test Result Message -->
+                    <div id="testResultContainer" class="hidden mt-4 p-3 rounded-lg text-sm text-center font-medium">
+                        <!-- Result text injected via JS -->
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </main>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
