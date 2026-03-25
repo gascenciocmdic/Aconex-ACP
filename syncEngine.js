@@ -175,9 +175,9 @@ class SyncEngine {
             do {
                 const params = { 
                     mail_box: 'Inbox', 
-                    start: startRow,
                     page_size: pageSize
                 };
+                if (startRow > 1) params.start = startRow;
                 if (status) params.status = status;
 
                 const xmlList = await this.client.fetchMail(params);
