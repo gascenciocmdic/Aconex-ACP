@@ -317,7 +317,16 @@ document.querySelectorAll('th[data-sort-trans]').forEach(th => {
 // 4. Notifications Engine
 // ======================================
 async function syncNotifications() {
-    if (!globalConfig.username || !globalConfig.password) return;
+    // Aseguramos que los valores estén actualizados desde el form (o Admin Panel)
+    globalConfig.projectId = confProjectId.value.trim();
+    globalConfig.username = confUser.value.trim();
+    globalConfig.password = confPass.value.trim();
+
+    if (!globalConfig.username || !globalConfig.password) {
+        alert("Por favor, ingresa tus credenciales en el Panel Admin antes de extraer Transmittals.");
+        tabs[1].click(); // Redirigir a Admin
+        return;
+    }
     
     notifTableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-slate-500 italic"><span class="animate-pulse">Consultando todos los Transmittals de Aconex...</span></td></tr>`;
     
@@ -327,11 +336,11 @@ async function syncNotifications() {
         updateTransFilterOptions();
         renderNotifications();
         
-        // Update Badge (only if we wanted to keep the "unread" concept, 
-        // but for now let's just show the dot if there are any new items since last session)
+        // Ocultar badge al ver las notificaciones (limpiar estado)
         notifBadge.classList.add('hidden'); 
     } catch (e) {
-        notifTableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-red-500 border border-red-500/20 bg-red-500/5">Error: ${e.message}</td></tr>`;
+        console.error("Error en syncNotifications:", e);
+        notifTableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-red-500 border border-red-500/20 bg-red-500/5">Error de conexión: ${e.message}</td></tr>`;
     }
 }
 
