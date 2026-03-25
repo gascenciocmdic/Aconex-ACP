@@ -32,7 +32,11 @@ class AconexClient {
 
     /** Helper function to execute requests to avoid code duplication */
     async _executeFetch(xmlPayload, affectGlobalSentinel, onCircuitBreakerTrip) {
-        const url = `https://us1.aconex.com/api/projects/${this.projectId}/register`;
+        // En lugar de apuntar a https://us1.aconex.com directamente (lo cual bloquea el navegador por CORS)
+        // Apuntamos al servidor de Vercel para que él haga la petición por detrás de escena de forma segura.
+        // Si estás ejecutándolo en local (npx serve), esto dará 404 a menos que instales una extensión "Allow CORS" 
+        // y reviertas esta URL a us1.aconex.com.
+        const url = `/aconex-proxy/projects/${this.projectId}/register`;
         const cleanPayload = this.cleanXmlString(xmlPayload);
     
         try {

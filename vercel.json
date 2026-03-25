@@ -3,15 +3,10 @@
   "buildCommand": null,
   "outputDirectory": null,
   "cleanUrls": true,
-  "headers": [
+  "rewrites": [
     {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        }
-      ]
+      "source": "/aconex-proxy/:path*",
+      "destination": "https://us1.aconex.com/api/:path*"
     }
   ]
 }
