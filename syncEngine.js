@@ -82,8 +82,13 @@ class SyncEngine {
         const transmittals = [];
         try {
             const xmlDoc = this.parser.parseFromString(xmlString, "text/xml");
-            const items = xmlDoc.querySelectorAll('MailItem');
             
+            // Aconex puede devolver <MailItem> o simplemente <Mail> según la versión de la API
+            let items = xmlDoc.querySelectorAll('MailItem');
+            if (items.length === 0) items = xmlDoc.querySelectorAll('Mail');
+            
+            console.log(`Debug Transmittals: Encontrados ${items.length} nodos XML.`);
+
             items.forEach(item => {
                 const getVal = (selector) => {
                     const el = item.querySelector(selector);
@@ -101,20 +106,23 @@ class SyncEngine {
                     if (userNode) {
                         const fn = userNode.querySelector('FirstName');
                         const ln = userNode.querySelector('LastName');
-                        user = fn && ln ? `${fn.textContent} ${ln.textContent}` : userNode.textContent.trim();
+                        user = (fn && ln) ? `${fn.textContent} ${ln.textContent}` : userNode.textContent.trim();
                     }
+                    if (!user) user = fromNode.getAttribute('UserFullName') || '';
+
                     if (orgNode) {
                         const on = orgNode.querySelector('Name');
                         org = on ? on.textContent.trim() : orgNode.textContent.trim();
                     }
+                    if (!org) org = fromNode.getAttribute('OrganizationName') || '';
                 }
 
                 transmittals.push({
-                    id: getVal('MailId'),
+                    id: getVal('MailId') || getVal('Id'),
                     subject: getVal('Subject'),
                     fromUser: user || 'S/N',
                     fromOrg: org || 'S/O',
-                    date: getVal('DateSent'),
+                    date: getVal('DateSent') || getVal('SentDate'),
                     isUnread: true
                 });
             });
