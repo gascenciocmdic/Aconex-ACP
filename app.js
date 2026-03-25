@@ -11,6 +11,8 @@ const confAppKey = document.getElementById('confAppKey');
 const confProjectId = document.getElementById('confProjectId');
 const confRegion = document.getElementById('confRegion');
 const confFilterName = document.getElementById('confFilterName');
+const filterTransRecipient = document.getElementById('filterTransRecipient');
+const filterTransStatus = document.getElementById('filterTransStatus');
 const confUser = document.getElementById('confUser');
 const confPass = document.getElementById('confPass');
 const btnTogglePass = document.getElementById('btnTogglePass');
@@ -380,6 +382,8 @@ function renderNotifications() {
     const query = filterTransSearch.value.toLowerCase();
     const userF = filterTransUser.value;
     const orgF = filterTransOrg.value;
+    const recipientF = filterTransRecipient.value;
+    const statusF = filterTransStatus.value;
 
     let filtered = localTransmittalsDB.filter(item => {
         const matchQ = !query || 
@@ -389,7 +393,10 @@ function renderNotifications() {
                       (item.toUser && item.toUser.toLowerCase().includes(query));
         const matchU = !userF || item.fromUser === userF;
         const matchO = !orgF || item.fromOrg === orgF;
-        return matchQ && matchU && matchO;
+        const matchR = !recipientF || (item.toUser && item.toUser.includes(recipientF));
+        const matchS = !statusF || item.status === statusF;
+        
+        return matchQ && matchU && matchO && matchR && matchS;
     });
 
     // Sort
@@ -455,21 +462,39 @@ function renderNotifications() {
 function updateTransFilterOptions() {
     const fields = [
         { id: 'filterTransUser', key: 'fromUser', label: 'Remitente' },
-        { id: 'filterTransOrg', key: 'fromOrg', label: 'Organización' }
+        { id: 'filterTransOrg', key: 'fromOrg', label: 'Organización' },
+        { id: 'filterTransStatus', key: 'status', label: 'Estatus' }
     ];
 
     fields.forEach(f => {
         const el = document.getElementById(f.id);
-        const uniqueValues = [...new Set(localTransmittalsDB.map(d => d[f.key]).filter(v => v))].sort();
-        let html = `<option value="">${f.label} (Todos)</option>`;
-        uniqueValues.forEach(val => {
-            html += `<option value="${val}">${val}</option>`;
-        });
-        el.innerHTML = html;
+        const currentVal = el.value;
+        const uniqueValues = [...new Set(localTransmittalsDB.map(i => i[f.key]))].filter(Boolean).sort();
+        
+        el.innerHTML = `<option value="">${f.label} (Todos)</option>` + 
+                       uniqueValues.map(v => `<option value="${v}" ${v === currentVal ? 'selected' : ''}>${v}</option>`).join('');
     });
+
+    // Filtro especial para Destinatarios (ya que pueden ser múltiples en un solo registro)
+    const recipientEl = document.getElementById('filterTransRecipient');
+    const currentR = recipientEl.value;
+    let allRecipients = [];
+    localTransmittalsDB.forEach(item => {
+        if (item.toUser) {
+            allRecipients = allRecipients.concat(item.toUser.split(', ').map(s => s.trim()));
+        }
+    });
+    const uniqueRecipients = [...new Set(allRecipients)].filter(Boolean).sort();
+    recipientEl.innerHTML = `<option value="">Destinatario (Todos)</option>` + 
+                            uniqueRecipients.map(v => `<option value="${v}" ${v === currentR ? 'selected' : ''}>${v}</option>`).join('');
 }
 
 btnRefreshNotif.addEventListener('click', syncNotifications);
+filterTransSearch.addEventListener('input', renderNotifications);
+filterTransUser.addEventListener('change', renderNotifications);
+filterTransOrg.addEventListener('change', renderNotifications);
+filterTransRecipient.addEventListener('change', renderNotifications);
+filterTransStatus.addEventListener('change', renderNotifications);
 
 // ======================================
 // 5. Synchronization Orchestration
