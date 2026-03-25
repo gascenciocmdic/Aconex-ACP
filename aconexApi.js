@@ -70,6 +70,7 @@ class AconexClient {
           });
     
           if (!response.ok) {
+            const errorBody = await response.text();
             // Evaluamos Auth failures
             if (response.status === 401 || response.status === 403) {
                 if (affectGlobalSentinel) {
@@ -81,7 +82,7 @@ class AconexClient {
                 }
                 throw new Error(`Auth Error (${response.status})`);
             }
-            throw new Error(`Aconex Error: ${response.status}`);
+            throw new Error(`Aconex Error: ${response.status} - ${errorBody.substring(0, 100)}`);
           }
           if (affectGlobalSentinel) this.failedAttempts = 0; // Reset
           return await response.text(); 
@@ -107,7 +108,10 @@ class AconexClient {
                     'Accept': 'application/xml'
                 }
             });
-            if (!response.ok) throw new Error(`Mail API Error (${response.status})`);
+            if (!response.ok) {
+                const errorBody = await response.text();
+                throw new Error(`Mail API Error (${response.status}): ${errorBody.substring(0, 200)}`);
+            }
             return await response.text();
         } catch (e) {
             throw e;

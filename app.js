@@ -354,7 +354,19 @@ async function syncNotifications() {
         notifBadge.classList.add('hidden'); 
     } catch (e) {
         console.error("Error en syncNotifications:", e);
-        notifTableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-red-500 border border-red-500/20 bg-red-500/5">Error de conexión: ${e.message}</td></tr>`;
+        // Mostramos el error detallado (que ahora incluye el cuerpo de la respuesta de Aconex)
+        notifTableBody.innerHTML = `
+            <tr>
+                <td colspan="4" class="px-6 py-12 text-center text-red-500 border border-red-500/20 bg-red-500/5">
+                    <div class="font-bold mb-2">Error de la API (400/500):</div>
+                    <div class="text-xs font-mono bg-slate-900 p-3 rounded border border-slate-700 max-w-xl mx-auto overflow-auto text-left">
+                        ${e.message}
+                    </div>
+                    <div class="mt-4 text-xs text-slate-400">
+                        Sugerencia: Verifica que el ID del proyecto sea correcto para la región seleccionada.
+                    </div>
+                </td>
+            </tr>`;
     } finally {
         btnRefreshNotif.innerHTML = originalText;
         btnRefreshNotif.disabled = false;
