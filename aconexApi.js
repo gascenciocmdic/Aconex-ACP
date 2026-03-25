@@ -36,7 +36,9 @@ class AconexClient {
         // Apuntamos al servidor de Vercel para que él haga la petición por detrás de escena de forma segura.
         // Si estás ejecutándolo en local (npx serve), esto dará 404 a menos que instales una extensión "Allow CORS" 
         // y reviertas esta URL a us1.aconex.com.
-        const url = `/aconex-proxy/projects/${this.projectId}/register/search`;
+        // Revertimos de /register/search a /register dado el 404 previo.
+        // El 405 original probablemente fue un rechazo por credenciales erroneas o payload.
+        const url = `/aconex-proxy/projects/${this.projectId}/register`;
         const cleanPayload = this.cleanXmlString(xmlPayload);
     
         try {
