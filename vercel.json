@@ -6,7 +6,7 @@
   "rewrites": [
     {
       "source": "/aconex-proxy/:path*",
-      "destination": "https://us1.aconex.com/api/:path*"
+      "destination": "https://us1.aconex.com/:path*"
     }
   ]
 }

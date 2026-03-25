@@ -33,12 +33,10 @@ class AconexClient {
     /** Helper function to execute requests to avoid code duplication */
     async _executeFetch(xmlPayload, affectGlobalSentinel, onCircuitBreakerTrip) {
         // En lugar de apuntar a https://us1.aconex.com directamente (lo cual bloquea el navegador por CORS)
-        // Apuntamos al servidor de Vercel para que él haga la petición por detrás de escena de forma segura.
-        // Si estás ejecutándolo en local (npx serve), esto dará 404 a menos que instales una extensión "Allow CORS" 
-        // y reviertas esta URL a us1.aconex.com.
-        // Revertimos de /register/search a /register dado el 404 previo.
-        // El 405 original probablemente fue un rechazo por credenciales erroneas o payload.
-        const url = `/aconex-proxy/projects/${this.projectId}/register`;
+        // Apuntamos al proxy de Vercel. Ahora el proxy apunta a la raiz (https://us1.aconex.com/),
+        // por lo que debemos incluir /api/ manualmente aquí.
+        // Endpoint oficial de Super Search: /api/projects/{id}/register/search
+        const url = `/aconex-proxy/api/projects/${this.projectId}/register/search`;
         const cleanPayload = this.cleanXmlString(xmlPayload);
     
         try {

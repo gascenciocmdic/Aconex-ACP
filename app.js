@@ -113,16 +113,17 @@ btnTestConn.addEventListener('click', async () => {
 });
 
 btnTogglePass.addEventListener('click', () => {
+    // Forzamos la lógica de visualización con estilos directos por si Tailwind tiene conflictos
     if (confPass.type === 'password') {
-        // Mostramos texto
         confPass.type = 'text';
-        iconEyeOpen.classList.add('hidden');
-        iconEyeClosed.classList.remove('hidden');
+        iconEyeOpen.style.display = 'none';
+        iconEyeClosed.style.display = 'block';
+        iconEyeClosed.classList.remove('hidden'); // Aseguramos que la clase de Tailwind no bloquee
     } else {
-        // Ocultamos texto
         confPass.type = 'password';
+        iconEyeOpen.style.display = 'block';
         iconEyeOpen.classList.remove('hidden');
-        iconEyeClosed.classList.add('hidden');
+        iconEyeClosed.style.display = 'none';
     }
 });
 
