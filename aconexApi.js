@@ -48,11 +48,15 @@ class AconexClient {
         // Aconex suele dar 405 (Method Not Allowed) en POST /register si el proyecto es estricto.
         let url = `/aconex-proxy/api/projects/${this.projectId}/register`;
         
-        // Si hay parámetros (como page_number), los añadimos a la URL
-        if (params && typeof params === 'object') {
-            const searchParams = new URLSearchParams(params);
-            url += `?${searchParams.toString()}`;
-        }
+        // Parámetros exactos de Power Query del usuario
+        const defaultParams = {
+            return_fields: 'filename,author,contractnumber,docno,title,doctype,statusid,revision,selectList1,selectList4,selectList3,registered,versionnumber,trackingid',
+            show_document_history: 'false'
+        };
+
+        const finalParams = { ...defaultParams, ...params };
+        const searchParams = new URLSearchParams(finalParams);
+        url += `?${searchParams.toString()}`;
     
         try {
           const response = await fetch(url, {

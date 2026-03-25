@@ -11,8 +11,19 @@ class SyncEngine {
     parseTotalPages(xmlString) {
         try {
             const xmlDoc = this.parser.parseFromString(xmlString, "text/xml");
-            const totalPagesNode = xmlDoc.querySelector('TotalPages');
-            return totalPagesNode ? parseInt(totalPagesNode.textContent, 10) : 1;
+            // En la lógica de Power Query, TotalPages es un ATRIBUTO del nodo raíz o SearchResults
+            // Ejemplo: <ProjectRegister TotalPages="5">
+            const root = xmlDoc.documentElement;
+            let total = root.getAttribute('TotalPages') || root.getAttribute('Attribute:TotalPages');
+            
+            // Si no está en la raíz, buscar en cualquier nodo que lo tenga
+            if (!total) {
+                const allElements = Array.from(xmlDoc.getElementsByTagName('*'));
+                const nodeWithAttr = allElements.find(el => el.hasAttribute('TotalPages'));
+                if (nodeWithAttr) total = nodeWithAttr.getAttribute('TotalPages');
+            }
+
+            return total ? parseInt(total, 10) : 1;
         } catch (e) {
             return 1;
         }
@@ -22,47 +33,37 @@ class SyncEngine {
         const docs = [];
         try {
             const xmlDoc = this.parser.parseFromString(xmlString, "text/xml");
+            // Según Power Query: Origen{0}[SearchResults]{0}[Document]
+            const nodes = xmlDoc.querySelectorAll('Document');
             
-            // Estrategia Ultra-Robusta: Buscamos cualquier elemento que actúe como "contenedor" de un documento.
-            // En Aconex esto puede ser <Document>, <ProjectRegisterData>, <DocumentRegister>, etc.
-            // Identificamos el nodo si tiene un hijo que parezca un DocumentNo.
-            const allElements = xmlDoc.getElementsByTagName('*');
-            const documentNodes = [];
-            
-            for (let i = 0; i < allElements.length; i++) {
-                const el = allElements[i];
-                // Si el elemento tiene un hijo llamado DocumentNo o DocumentNumber, es un candidato a Fila.
-                const hasDocId = el.querySelector('DocumentNo, DocumentNumber, DocumentID, Document_Number');
-                if (hasDocId && !documentNodes.some(n => n.contains(el))) {
-                    documentNodes.push(el);
-                }
-            }
-
-            documentNodes.forEach(node => {
+            nodes.forEach(node => {
                 const getTxt = (selectors) => {
+                    const children = Array.from(node.children);
                     for (const s of selectors) {
-                        // Buscamos tanto con selector normal como con el nombre base (para soportar namespaces)
-                        const el = node.querySelector(s) || 
-                                   Array.from(node.children).find(c => c.nodeName.split(':').pop() === s);
-                        if (el && el.textContent.trim()) return el.textContent.trim();
+                        const child = children.find(c => {
+                            const localName = c.nodeName.split(':').pop();
+                            return localName === s;
+                        });
+                        if (child && child.textContent.trim()) return child.textContent.trim();
                     }
                     return '';
                 };
                 
+                // Mapeo EXACTO según fnDocumentosSinH de Power Query
                 docs.push({
-                    docno: getTxt(['DocumentNo', 'DocumentNumber', 'DocumentID', 'Document_Number']),
-                    title: getTxt(['Title', 'DocumentTitle', 'Subject', 'Document_Title']),
-                    revision: getTxt(['Revision', 'DocumentRevision', 'Rev', 'Document_Revision']),
-                    status: getTxt(['Status', 'DocumentStatus', 'CurrentStatus', 'Document_Status']),
-                    modified_date: getTxt(['ModifiedDate', 'Modified', 'LastModified', 'Modified_Date']),
-                    wbs: getTxt(['WBS', 'WorkPackage', 'WBS_Code']),
-                    specialty: getTxt(['Specialty', 'Disc', 'Discipline']),
-                    contract: getTxt(['Contract', 'Attribute1', 'Attr1', 'ContractNumber']),
-                    author: getTxt(['Author', 'CreatedBy', 'Originator'])
+                    docno: getTxt(['DocumentNumber', 'NumDoc', 'DocumentNo']),
+                    title: getTxt(['Title', 'DocumentTitle', 'Subject']),
+                    revision: getTxt(['Revision', 'DocumentRevision']),
+                    status: getTxt(['DocumentStatus', 'Estatus', 'StatusID']),
+                    modified_date: getTxt(['DateModified', 'ModifiedDate', 'Modified']),
+                    wbs: getTxt(['SelectList1', 'WBS']),
+                    specialty: getTxt(['SelectList3', 'Especialidad', 'Specialty']),
+                    contract: getTxt(['SelectList4', 'Contrato', 'ContractNumber']),
+                    author: getTxt(['Author', 'CreatedBy'])
                 });
             });
         } catch (e) {
-            console.error("Error crítico parseando XML Aconex:", e);
+            console.error("Error crítico parseando XML Aconex (Optimizado):", e);
         }
         return docs;
     }
@@ -71,7 +72,7 @@ class SyncEngine {
         try {
             if (onStart) onStart();
 
-            // Paginación establecida para un máximo de 500 registros por página (Restricción Aconex)
+            // Paginación establecida por el usuario
             const params = {
                 search_type: 'PAGED',
                 page_size: 500,
@@ -79,7 +80,8 @@ class SyncEngine {
             };
 
             const initialXml = await this.client.fetchProjects(params, onCircuitBreakerTrip);
-            if (onRawResponse) onRawResponse(initialXml); // Para depuración
+            if (onRawResponse) onRawResponse(initialXml);
+            
             const totalPages = this.parseTotalPages(initialXml);
             
             // Procesar primera página
@@ -106,8 +108,7 @@ class SyncEngine {
                     if (onDocumentUpsert) await onDocumentUpsert(doc);
                 }
                 
-                // Pausa de cortesía para no saturar el servidor
-                await new Promise(r => setTimeout(r, 400));
+                await new Promise(r => setTimeout(r, 300));
             }
 
             if (onFinish) onFinish();
