@@ -83,46 +83,59 @@ class SyncEngine {
         try {
             const xmlDoc = this.parser.parseFromString(xmlString, "text/xml");
             
-            // Aconex puede devolver <MailItem> o simplemente <Mail> según la versión de la API
+            // Aconex Mail API puede usar <MailItem>, <Mail>, o <MailHeader>
             let items = xmlDoc.querySelectorAll('MailItem');
             if (items.length === 0) items = xmlDoc.querySelectorAll('Mail');
+            if (items.length === 0) items = xmlDoc.querySelectorAll('MailHeader');
             
             console.log(`Debug Transmittals: Encontrados ${items.length} nodos XML.`);
 
-            items.forEach(item => {
-                const getVal = (selector) => {
-                    const el = item.querySelector(selector);
-                    return el ? el.textContent.trim() : '';
+            items.forEach(node => {
+                // Función recursiva para buscar contenido por palabra clave parcial en cualquier nivel
+                const findInNode = (el, keywords) => {
+                    if (!el) return '';
+                    const children = Array.from(el.children);
+                    // 1. Buscar en hijos directos
+                    for (const child of children) {
+                        const name = child.nodeName.split(':').pop().toLowerCase();
+                        if (keywords.some(k => name === k.toLowerCase() || name.includes(k.toLowerCase()))) {
+                            let val = child.textContent.trim();
+                            if (!val && child.children.length > 0) val = child.children[0].textContent.trim();
+                            if (val) return val;
+                        }
+                    }
+                    // 2. Buscar recursivamente si no se encontró
+                    for (const child of children) {
+                        const deep = findInNode(child, keywords);
+                        if (deep) return deep;
+                    }
+                    // 3. Buscar en atributos del nodo actual
+                    for (const attr of el.attributes) {
+                        const aname = attr.name.toLowerCase();
+                        if (keywords.some(k => aname.includes(k.toLowerCase()))) return attr.value;
+                    }
+                    return '';
                 };
 
-                // Parsing más robusto para Nombres y Organizaciones
-                const fromNode = item.querySelector('From');
-                let user = '';
-                let org = '';
-                if (fromNode) {
-                    const userNode = fromNode.querySelector('User');
-                    const orgNode = fromNode.querySelector('Organization');
-                    
-                    if (userNode) {
-                        const fn = userNode.querySelector('FirstName');
-                        const ln = userNode.querySelector('LastName');
-                        user = (fn && ln) ? `${fn.textContent} ${ln.textContent}` : userNode.textContent.trim();
-                    }
-                    if (!user) user = fromNode.getAttribute('UserFullName') || '';
+                const subject = findInNode(node, ['Subject', 'Asunto', 'Title']);
+                const mailId = findInNode(node, ['MailId', 'Id', 'MailID']);
+                const date = findInNode(node, ['DateSent', 'SentDate', 'Date', 'Fecha']);
+                
+                // Buscar De (Usuario y Organización)
+                const fromNode = Array.from(node.children).find(c => c.nodeName.toLowerCase().includes('from'));
+                let user = findInNode(fromNode || node, ['User', 'From', 'Sender', 'Author']);
+                let org = findInNode(fromNode || node, ['Organization', 'Org', 'Company', 'Empresa']);
 
-                    if (orgNode) {
-                        const on = orgNode.querySelector('Name');
-                        org = on ? on.textContent.trim() : orgNode.textContent.trim();
-                    }
-                    if (!org) org = fromNode.getAttribute('OrganizationName') || '';
-                }
+                // Si 'user' contiene el mismo valor que 'org', o si es muy genérico, intentar atributo alternativo
+                if (!user || user === 'S/N') user = node.getAttribute('UserFullName') ||  node.getAttribute('From') || 'S/N';
+                if (!org || org === 'S/O') org = node.getAttribute('OrganizationName') || node.getAttribute('Org') || 'S/O';
 
                 transmittals.push({
-                    id: getVal('MailId') || getVal('Id'),
-                    subject: getVal('Subject'),
-                    fromUser: user || 'S/N',
-                    fromOrg: org || 'S/O',
-                    date: getVal('DateSent') || getVal('SentDate'),
+                    id: mailId || Math.random().toString(36),
+                    subject: subject || '(Sin Asunto)',
+                    fromUser: user,
+                    fromOrg: org,
+                    date: date,
                     isUnread: true
                 });
             });
