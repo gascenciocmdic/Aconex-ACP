@@ -342,11 +342,14 @@ async function syncNotifications() {
     
     const engine = new SyncEngine(null, globalConfig);
     try {
-        const xml = await engine.client.fetchMail({ mail_box: 'Inbox' });
-        // Volcamos al log técnico para depuración
-        if (techLog) techLog.value += `\n--- DEBUG TRANSMITTAL XML ---\n${xml}\n`;
-        
-        localTransmittalsDB = engine.parseTransmittalsFromXml(xml);
+        // Nuevo flujo: Sincronización en dos pasos con progreso
+        localTransmittalsDB = await engine.syncAllTransmittals({
+            onProgress: (done, total) => {
+                notifTableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-slate-500 italic"><span class="animate-pulse">Descargando detalles... ${done} de ${total}</span></td></tr>`;
+                if (techLog && done % 5 === 0) techLog.value += `\rSincronizando: ${done}/${total}...`;
+            }
+        });
+
         updateTransFilterOptions();
         renderNotifications();
         

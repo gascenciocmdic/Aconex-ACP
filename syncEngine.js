@@ -145,19 +145,44 @@ class SyncEngine {
         return transmittals;
     }
 
-    async syncAllTransmittals(onFinished) {
+    async syncAllTransmittals(options = {}) {
+        const { onProgress } = options;
         try {
-            // Lógica ALINEADA con Python: mail_box=Inbox y search_query=mailtype:Transmittal
-            const params = {
-                mail_box: 'Inbox',
-                search_query: 'mailtype:Transmittal'
-            };
-            const xml = await this.client.fetchMail(params);
-            const list = this.parseTransmittalsFromXml(xml);
-            if (onFinished) onFinished(list);
-            return list;
+            // Paso 1: Obtener la lista de MailIds
+            const params = { mail_box: 'Inbox' };
+            const xmlList = await this.client.fetchMail(params);
+            const headers = this.parseTransmittalsFromXml(xmlList);
+            
+            if (headers.length === 0) return [];
+            
+            const fullDetails = [];
+            const total = headers.length;
+            
+            // Paso 2: Obtener el detalle de CADA CORREO
+            // Para no saturar la API, procesaremos por lotes pequeños
+            for (let i = 0; i < total; i++) {
+                const header = headers[i];
+                try {
+                    const xmlDetail = await this.client.fetchMailDetail(header.id);
+                    const parsed = this.parseTransmittalsFromXml(xmlDetail);
+                    if (parsed.length > 0) {
+                        fullDetails.push(parsed[0]);
+                    }
+                } catch (e) {
+                    console.error(`Error descargando detalle de Mail ${header.id}:`, e);
+                    // Si falla el detalle, guardamos al menos el encabezado con S/N
+                    fullDetails.push(header);
+                }
+
+                if (onProgress) onProgress(i + 1, total);
+                
+                // Pequeña pausa para ser respetuosos con la API
+                if (i % 5 === 0) await new Promise(r => setTimeout(r, 100));
+            }
+
+            return fullDetails;
         } catch (e) {
-            throw e; // Relanzar para que app.js lo capture y muestre en UI
+            throw e;
         }
     }
 

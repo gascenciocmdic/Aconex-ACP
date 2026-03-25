@@ -117,6 +117,27 @@ class AconexClient {
             throw e;
         }
     }
+
+    /** 
+     * Método para obtener el detalle completo de un correo específico.
+     */
+    async fetchMailDetail(mailId) {
+        const url = `/aconex-proxy/${this.region}/api/projects/${this.projectId}/mail/${mailId}`;
+        try {
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'X-Application-Key': '827ccb23-a96e-4e49-be99-d7263c7a8ab4',
+                    'Authorization': `Basic ${this.credentials}`,
+                    'Accept': 'application/xml'
+                }
+            });
+            if (!response.ok) throw new Error(`Mail Detail Error (${response.status})`);
+            return await response.text();
+        } catch (e) {
+            throw e;
+        }
+    }
 }
 
 export default AconexClient;
