@@ -90,6 +90,27 @@ class AconexClient {
           throw err;
         }
     }
-  }
+
+    async fetchMail(params = {}) {
+        let url = `/aconex-proxy/api/projects/${this.projectId}/mail`;
+        const searchParams = new URLSearchParams(params);
+        url += `?${searchParams.toString()}`;
+
+        try {
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'X-Application-Key': '827ccb23-a96e-4e49-be99-d7263c7a8ab4',
+                    'Authorization': `Basic ${this.credentials}`,
+                    'Accept': 'application/xml'
+                }
+            });
+            if (!response.ok) throw new Error(`Mail API Error (${response.status})`);
+            return await response.text();
+        } catch (e) {
+            throw e;
+        }
+    }
+}
   
-  export default AconexClient;
+export default AconexClient;

@@ -90,11 +90,30 @@ class SyncEngine {
                     return el ? el.textContent.trim() : '';
                 };
 
+                // Parsing más robusto para Nombres y Organizaciones
+                const fromNode = item.querySelector('From');
+                let user = '';
+                let org = '';
+                if (fromNode) {
+                    const userNode = fromNode.querySelector('User');
+                    const orgNode = fromNode.querySelector('Organization');
+                    
+                    if (userNode) {
+                        const fn = userNode.querySelector('FirstName');
+                        const ln = userNode.querySelector('LastName');
+                        user = fn && ln ? `${fn.textContent} ${ln.textContent}` : userNode.textContent.trim();
+                    }
+                    if (orgNode) {
+                        const on = orgNode.querySelector('Name');
+                        org = on ? on.textContent.trim() : orgNode.textContent.trim();
+                    }
+                }
+
                 transmittals.push({
                     id: getVal('MailId'),
                     subject: getVal('Subject'),
-                    fromUser: getVal('From > User'),
-                    fromOrg: getVal('From > Organization'),
+                    fromUser: user || 'S/N',
+                    fromOrg: org || 'S/O',
                     date: getVal('DateSent'),
                     isUnread: true
                 });
@@ -107,17 +126,17 @@ class SyncEngine {
 
     async syncAllTransmittals(onFinished) {
         try {
-            // Obtenemos todos los Transmittals (mail_type_id=-2) sin filtrar por "unread"
+            // Lógica ALINEADA con Python: mail_box=Inbox y search_query=mailtype:Transmittal
             const params = {
-                mail_type_id: -2
+                mail_box: 'Inbox',
+                search_query: 'mailtype:Transmittal'
             };
             const xml = await this.client.fetchMail(params);
             const list = this.parseTransmittalsFromXml(xml);
             if (onFinished) onFinished(list);
             return list;
         } catch (e) {
-            console.error("Error sincronizando transmittals:", e);
-            return [];
+            throw e; // Relanzar para que app.js lo capture y muestre en UI
         }
     }
 

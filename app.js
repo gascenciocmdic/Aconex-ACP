@@ -327,8 +327,13 @@ async function syncNotifications() {
         tabs[1].click(); // Redirigir a Admin
         return;
     }
+
+    const originalText = btnRefreshNotif.innerHTML;
+    btnRefreshNotif.innerHTML = `<span class="animate-spin inline-block w-3.5 h-3.5 border-2 border-slate-500 border-t-white rounded-full"></span> Extrayendo...`;
+    btnRefreshNotif.disabled = true;
     
     notifTableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-slate-500 italic"><span class="animate-pulse">Consultando todos los Transmittals de Aconex...</span></td></tr>`;
+
     
     const engine = new SyncEngine(null, globalConfig);
     try {
@@ -341,6 +346,9 @@ async function syncNotifications() {
     } catch (e) {
         console.error("Error en syncNotifications:", e);
         notifTableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-red-500 border border-red-500/20 bg-red-500/5">Error de conexión: ${e.message}</td></tr>`;
+    } finally {
+        btnRefreshNotif.innerHTML = originalText;
+        btnRefreshNotif.disabled = false;
     }
 }
 
