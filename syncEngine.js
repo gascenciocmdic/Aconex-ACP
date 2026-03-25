@@ -40,16 +40,25 @@ class SyncEngine {
                 const getTxt = (selectors) => {
                     const children = Array.from(node.children);
                     for (const s of selectors) {
-                        const child = children.find(c => {
-                            const localName = c.nodeName.split(':').pop();
-                            return localName === s;
-                        });
-                        if (child && child.textContent.trim()) return child.textContent.trim();
+                        const child = children.find(c => c.nodeName.split(':').pop() === s);
+                        if (child) {
+                            // 1. Intentar texto directo
+                            let text = child.textContent.trim();
+                            // 2. Si está vacío y tiene hijos (ej. <Value>), buscar en el primer hijo
+                            if (!text && child.children.length > 0) {
+                                text = child.children[0].textContent.trim();
+                            }
+                            // 3. Si sigue vacío, buscar atributo 'Value' o 'Text'
+                            if (!text) {
+                                text = child.getAttribute('Value') || child.getAttribute('Text') || '';
+                            }
+                            if (text) return text;
+                        }
                     }
                     return '';
                 };
                 
-                // Mapeo EXACTO según fnDocumentosSinH de Power Query
+                // Mapeo EXACTO y ROBUSTO
                 docs.push({
                     docno: getTxt(['DocumentNumber', 'NumDoc', 'DocumentNo']),
                     title: getTxt(['Title', 'DocumentTitle', 'Subject']),
@@ -57,25 +66,26 @@ class SyncEngine {
                     status: getTxt(['DocumentStatus', 'Estatus', 'StatusID']),
                     modified_date: getTxt(['DateModified', 'ModifiedDate', 'Modified']),
                     wbs: getTxt(['SelectList1', 'WBS']),
-                    specialty: getTxt(['SelectList3', 'Especialidad', 'Specialty']),
+                    specialty: getTxt(['SelectList3', 'Especialidad', 'Specialty', 'Disciplina']),
                     contract: getTxt(['SelectList4', 'Contrato', 'ContractNumber']),
-                    author: getTxt(['Author', 'CreatedBy'])
+                    author: getTxt(['Author', 'CreatedBy']),
+                    doc_type: getTxt(['DocumentType', 'Doctype', 'Tipo Doc'])
                 });
             });
         } catch (e) {
-            console.error("Error crítico parseando XML Aconex (Optimizado):", e);
+            console.error("Error crítico parseando XML Aconex (Ultra-Robust):", e);
         }
         return docs;
     }
 
-    async syncAllData({ onStart, onProgress, onDocumentUpsert, onCircuitBreakerTrip, onFinish, onError, onRawResponse }) {
+    async syncAllData({ onStart, onProgress, onDocumentUpsert, onCircuitBreakerTrip, onFinish, onError, onRawResponse, pageSize = 200 }) {
         try {
             if (onStart) onStart();
 
-            // Paginación establecida por el usuario
+            // Paginación configurada por el usuario (mínimo 50, máximo 500)
             const params = {
                 search_type: 'PAGED',
-                page_size: 500,
+                page_size: Math.min(Math.max(pageSize, 50), 500),
                 page_number: 1
             };
 
