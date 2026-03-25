@@ -168,15 +168,15 @@ class SyncEngine {
             const allHeaders = [];
             let startRow = 1;
             let totalResults = 0;
-            const pageSize = 250;
+            const pageSize = 500;
 
             if (onProgress) onProgress(0, 0, "Buscando cabeceras...");
 
             do {
                 const params = { 
                     mail_box: 'Inbox', 
-                    search_type: 'PAGED',
-                    start_row: startRow 
+                    start: startRow,
+                    page_size: pageSize
                 };
                 if (status) params.status = status;
 
