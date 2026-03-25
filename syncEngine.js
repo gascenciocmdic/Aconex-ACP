@@ -91,51 +91,55 @@ class SyncEngine {
             console.log(`Debug Transmittals: Encontrados ${items.length} nodos XML.`);
 
             items.forEach(node => {
-                // Función recursiva para buscar contenido por palabra clave parcial en cualquier nivel
-                const findInNode = (el, keywords) => {
-                    if (!el) return '';
-                    const children = Array.from(el.children);
-                    // 1. Buscar en hijos directos
-                    for (const child of children) {
-                        const name = child.nodeName.split(':').pop().toLowerCase();
-                        if (keywords.some(k => name === k.toLowerCase() || name.includes(k.toLowerCase()))) {
-                            let val = child.textContent.trim();
-                            if (!val && child.children.length > 0) val = child.children[0].textContent.trim();
-                            if (val) return val;
-                        }
-                    }
-                    // 2. Buscar recursivamente si no se encontró
-                    for (const child of children) {
-                        const deep = findInNode(child, keywords);
-                        if (deep) return deep;
-                    }
-                    // 3. Buscar en atributos del nodo actual
-                    for (const attr of el.attributes) {
-                        const aname = attr.name.toLowerCase();
-                        if (keywords.some(k => aname.includes(k.toLowerCase()))) return attr.value;
-                    }
-                    return '';
+                const getVal = (sel) => {
+                    const el = node.querySelector(sel);
+                    return el ? el.textContent.trim() : '';
                 };
 
-                const subject = findInNode(node, ['Subject', 'Asunto', 'Title']);
-                const mailId = findInNode(node, ['MailId', 'Id', 'MailID']);
-                const date = findInNode(node, ['DateSent', 'SentDate', 'Date', 'Fecha']);
-                
-                // Buscar De (Usuario y Organización)
-                const fromNode = Array.from(node.children).find(c => c.nodeName.toLowerCase().includes('from'));
-                let user = findInNode(fromNode || node, ['User', 'From', 'Sender', 'Author']);
-                let org = findInNode(fromNode || node, ['Organization', 'Org', 'Company', 'Empresa']);
+                // 1. Datos Básicos
+                const mailId = node.getAttribute('MailId') || getVal('MailId');
+                const mailNo = getVal('MailNo');
+                const subject = getVal('Subject');
+                const date = getVal('SentDate') || getVal('DateSent');
+                const status = getVal('ApprovalStatus') || getVal('Status');
 
-                // Si 'user' contiene el mismo valor que 'org', o si es muy genérico, intentar atributo alternativo
-                if (!user || user === 'S/N') user = node.getAttribute('UserFullName') ||  node.getAttribute('From') || 'S/N';
-                if (!org || org === 'S/O') org = node.getAttribute('OrganizationName') || node.getAttribute('Org') || 'S/O';
+                // 2. Remitente (FromUserDetails)
+                const fromNode = node.querySelector('FromUserDetails');
+                let fromUser = 'S/N';
+                let fromOrg = 'S/O';
+                if (fromNode) {
+                    fromUser = fromNode.querySelector('Name')?.textContent.trim() || 'S/N';
+                    fromOrg = fromNode.querySelector('OrganizationName')?.textContent.trim() || 'S/O';
+                }
+
+                // 3. Destinatarios (ToUsers -> Recipient)
+                const recipients = Array.from(node.querySelectorAll('ToUsers > Recipient')).map(r => r.querySelector('Name')?.textContent.trim()).filter(Boolean);
+                const toUser = recipients.length > 0 ? recipients.join(', ') : 'S/D';
+
+                // 4. Adjuntos (Attachments -> RegisteredDocumentAttachment)
+                // Usamos el primero para el listado principal
+                const attachment = node.querySelector('RegisteredDocumentAttachment');
+                let docName = '';
+                let docRev = '';
+                let fileName = '';
+                if (attachment) {
+                    docName = attachment.querySelector('Title')?.textContent.trim() || '';
+                    docRev = attachment.querySelector('Revision')?.textContent.trim() || '';
+                    fileName = attachment.querySelector('FileName')?.textContent.trim() || '';
+                }
 
                 transmittals.push({
-                    id: mailId || Math.random().toString(36),
+                    id: mailId,
+                    mailNo: mailNo,
                     subject: subject || '(Sin Asunto)',
-                    fromUser: user,
-                    fromOrg: org,
+                    fromUser: fromUser,
+                    fromOrg: fromOrg,
+                    toUser: toUser,
                     date: date,
+                    status: status,
+                    docName: docName,
+                    docRev: docRev,
+                    fileName: fileName,
                     isUnread: true
                 });
             });

@@ -382,7 +382,11 @@ function renderNotifications() {
     const orgF = filterTransOrg.value;
 
     let filtered = localTransmittalsDB.filter(item => {
-        const matchQ = !query || item.subject.toLowerCase().includes(query) || item.fromUser.toLowerCase().includes(query);
+        const matchQ = !query || 
+                      item.subject.toLowerCase().includes(query) || 
+                      item.fromUser.toLowerCase().includes(query) ||
+                      (item.mailNo && item.mailNo.toLowerCase().includes(query)) ||
+                      (item.toUser && item.toUser.toLowerCase().includes(query));
         const matchU = !userF || item.fromUser === userF;
         const matchO = !orgF || item.fromOrg === orgF;
         return matchQ && matchU && matchO;
@@ -409,21 +413,39 @@ function renderNotifications() {
     transCount.textContent = filtered.length;
 
     if (filtered.length === 0) {
-        notifTableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-slate-500 italic">No se encontraron Transmittals con los filtros aplicados.</td></tr>`;
+        notifTableBody.innerHTML = `<tr><td colspan="7" class="px-6 py-12 text-center text-slate-500 italic">No se encontraron Transmittals con los filtros aplicados.</td></tr>`;
         return;
     }
 
     let html = '';
     filtered.forEach(item => {
-        let displayDate = item.date;
-        try { displayDate = new Date(item.date).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }); } catch(e){}
+        const dateStr = item.date ? new Date(item.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A';
+        const docInfo = item.docName ? `<span class="text-brand font-medium">${item.docName}</span> <span class="text-[10px] bg-slate-700 px-1.5 py-0.5 rounded text-slate-300 ml-1">${item.docRev}</span>` : '<span class="text-slate-500 italic">Sin adjunto</span>';
+        const fileInfo = item.fileName ? `<div class="text-[10px] text-slate-500 mt-1"><i class="far fa-file-pdf mr-1"></i>${item.fileName}</div>` : '';
 
         html += `
             <tr class="hover:bg-slate-800/80 transition-colors border-b border-slate-700/30">
-                <td class="px-6 py-4 font-semibold text-slate-200">${item.fromUser}</td>
-                <td class="px-6 py-4 text-xs text-slate-400">${item.fromOrg}</td>
-                <td class="px-6 py-4 font-medium text-brand truncate max-w-sm" title="${item.subject}">${item.subject}</td>
-                <td class="px-6 py-4 text-xs text-slate-500">${displayDate}</td>
+                <td class="px-6 py-4 text-xs font-mono text-slate-400">${dateStr}</td>
+                <td class="px-6 py-4 font-medium text-slate-200">${item.mailNo || item.id}</td>
+                <td class="px-6 py-4 whitespace-normal max-w-xs">
+                    <div class="text-slate-100 font-medium truncate" title="${item.subject}">${item.subject}</div>
+                </td>
+                <td class="px-6 py-4 text-xs">
+                    <div class="text-slate-200">${item.fromUser}</div>
+                    <div class="text-slate-500">${item.fromOrg}</div>
+                </td>
+                <td class="px-6 py-4 text-xs max-w-[150px] overflow-hidden text-ellipsis text-slate-400" title="${item.toUser}">
+                    ${item.toUser}
+                </td>
+                <td class="px-6 py-4">
+                    <span class="px-2 py-1 rounded-full text-[10px] uppercase font-bold ${item.status === 'Approved' ? 'bg-green-500/10 text-green-400' : 'bg-slate-700 text-slate-300'}">
+                        ${item.status || 'N/A'}
+                    </span>
+                </td>
+                <td class="px-6 py-4 text-xs">
+                    ${docInfo}
+                    ${fileInfo}
+                </td>
             </tr>
         `;
     });
