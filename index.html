@@ -172,6 +172,30 @@
                     </table>
                 </div>
             </div>
+
+            <!-- Documents Pagination -->
+            <div class="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-900/30 p-4 rounded-xl border border-slate-700/50">
+                <div class="flex items-center gap-3">
+                    <label class="text-xs text-slate-400">Mostrar:</label>
+                    <select id="docPagingSize" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-300 outline-none focus:ring-1 focus:ring-brand">
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="200">200</option>
+                        <option value="500">500</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="docPrev" class="p-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-brand disabled:opacity-30 disabled:cursor-not-allowed">
+                        <i class="fas fa-chevron-left text-xs"></i>
+                    </button>
+                    <div id="docPagingInfo" class="text-xs text-slate-300 font-medium bg-slate-800 px-4 py-2 rounded-lg border border-slate-700">
+                        Página <span id="docCurrentPage">1</span> de <span id="docTotalPages">1</span>
+                    </div>
+                    <button id="docNext" class="p-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-brand disabled:opacity-30 disabled:cursor-not-allowed">
+                        <i class="fas fa-chevron-right text-xs"></i>
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- ======================= -->
@@ -246,6 +270,30 @@
                             </tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- Transmittal Pagination -->
+            <div class="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-900/30 p-4 rounded-xl border border-slate-700/50">
+                <div class="flex items-center gap-3">
+                    <label class="text-xs text-slate-400">Mostrar:</label>
+                    <select id="transPagingSize" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-300 outline-none focus:ring-1 focus:ring-brand">
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="200">200</option>
+                        <option value="500">500</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="transPrev" class="p-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-brand disabled:opacity-30 disabled:cursor-not-allowed">
+                        <i class="fas fa-chevron-left text-xs"></i>
+                    </button>
+                    <div id="transPagingInfo" class="text-xs text-slate-300 font-medium bg-slate-800 px-4 py-2 rounded-lg border border-slate-700">
+                        Página <span id="transCurrentPage">1</span> de <span id="transTotalPages">1</span>
+                    </div>
+                    <button id="transNext" class="p-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-brand disabled:opacity-30 disabled:cursor-not-allowed">
+                        <i class="fas fa-chevron-right text-xs"></i>
+                    </button>
                 </div>
             </div>
         </div>

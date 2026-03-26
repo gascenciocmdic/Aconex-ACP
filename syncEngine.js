@@ -189,11 +189,13 @@ class SyncEngine {
 
                 if (onProgress) onProgress(0, 0, `Obtenidas ${allHeaders.length} de ${totalResults} cabeceras...`);
                 
-                startRow += pageSize;
+                if (metadata.totalOnPage === 0) break;
+                startRow += metadata.totalOnPage;
+                
                 // Pequeño delay entre páginas de búsqueda
                 if (startRow <= totalResults) await new Promise(r => setTimeout(r, 200));
 
-            } while (startRow <= totalResults);
+            } while (startRow <= totalResults && allHeaders.length < totalResults);
 
             if (allHeaders.length === 0) return [];
             

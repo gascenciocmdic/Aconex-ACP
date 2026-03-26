@@ -56,6 +56,12 @@ const transCount = document.getElementById('transCount');
 let localDB = []; 
 let localTransmittalsDB = [];
 let isSyncing = false;
+
+// Pagination State
+let docCurrentPage = 1;
+let docPageSize = 50;
+let transCurrentPage = 1;
+let transPageSize = 50;
 let globalConfig = {
     projectId: confProjectId.value,
     region: confRegion.value,
@@ -165,6 +171,7 @@ function handleSort(field) {
         sortState.field = field;
         sortState.direction = 'asc';
     }
+    docCurrentPage = 1; // Reset to page 1 on sort
     
     // Update Icons UI
     document.querySelectorAll('th[data-sort] .sort-icon').forEach(icon => {
@@ -186,7 +193,7 @@ document.querySelectorAll('th[data-sort]').forEach(th => {
     th.addEventListener('click', () => handleSort(th.dataset.sort));
 });
 
-function renderTable() {
+function applyFilters(data) {
     const query = filterSearch.value.toLowerCase();
     const statusF = filterStatus.value;
     const contractorF = filterContractor.value;
@@ -194,8 +201,8 @@ function renderTable() {
     const docTypeF = filterDocType.value;
     const specialtyF = filterSpecialty.value;
 
-    let filtered = localDB.filter(doc => {
-        const matchQ = !query || doc.docno.toLowerCase().includes(query) || doc.title.toLowerCase().includes(query);
+    return data.filter(doc => {
+        const matchQ = !query || (doc.docno && doc.docno.toLowerCase().includes(query)) || (doc.title && doc.title.toLowerCase().includes(query));
         const matchS = !statusF || doc.status === statusF;
         const matchC = !contractorF || doc.author === contractorF;
         const matchR = !revF || doc.revision === revF;
@@ -204,6 +211,10 @@ function renderTable() {
         
         return matchQ && matchS && matchC && matchR && matchT && matchSpec;
     });
+}
+
+function renderTable() {
+    let filtered = applyFilters(localDB);
 
     // Sorting
     filtered.sort((a, b) => {
@@ -225,13 +236,27 @@ function renderTable() {
 
     tblCount.textContent = filtered.length;
 
-    if (filtered.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="9" class="px-6 py-8 text-center text-slate-500">No hay resultados para mostrar.</td></tr>`;
+    // Pagination Logic
+    const totalPages = Math.ceil(filtered.length / docPageSize) || 1;
+    if (docCurrentPage > totalPages) docCurrentPage = totalPages;
+    
+    const start = (docCurrentPage - 1) * docPageSize;
+    const end = start + docPageSize;
+    const paginated = filtered.slice(start, end);
+
+    // Update Paging UI
+    document.getElementById('docCurrentPage').textContent = docCurrentPage;
+    document.getElementById('docTotalPages').textContent = totalPages;
+    document.getElementById('docPrev').disabled = (docCurrentPage <= 1);
+    document.getElementById('docNext').disabled = (docCurrentPage >= totalPages);
+
+    if (paginated.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="9" class="px-6 py-8 text-center text-slate-500 italic">No se encontraron documentos con los filtros aplicados.</td></tr>`;
         return;
     }
 
     let html = '';
-    filtered.forEach(doc => {
+    paginated.forEach(doc => {
         let displayDate = doc.modified_date;
         if (displayDate) {
             const date = new Date(displayDate);
@@ -261,8 +286,8 @@ function renderTable() {
 }
 
 [filterSearch, filterStatus, filterContractor, filterRev, filterDocType, filterSpecialty].forEach(el => {
-    el.addEventListener('change', renderTable);
-    if(el.id === 'filterSearch') el.addEventListener('input', renderTable);
+    el.addEventListener('change', () => { docCurrentPage = 1; renderTable(); });
+    if(el.id === 'filterSearch') el.addEventListener('input', () => { docCurrentPage = 1; renderTable(); });
 });
 
 function updateFilterOptions() {
@@ -385,17 +410,17 @@ async function syncNotifications() {
     }
 }
 
-function renderNotifications() {
+function applyTransFilters(data) {
     const query = filterTransSearch.value.toLowerCase();
     const userF = filterTransUser.value;
     const orgF = filterTransOrg.value;
     const recipientF = filterTransRecipient.value;
     const statusF = filterTransStatus.value;
 
-    let filtered = localTransmittalsDB.filter(item => {
+    return data.filter(item => {
         const matchQ = !query || 
-                      item.subject.toLowerCase().includes(query) || 
-                      item.fromUser.toLowerCase().includes(query) ||
+                      (item.subject && item.subject.toLowerCase().includes(query)) || 
+                      (item.fromUser && item.fromUser.toLowerCase().includes(query)) ||
                       (item.mailNo && item.mailNo.toLowerCase().includes(query)) ||
                       (item.toUser && item.toUser.toLowerCase().includes(query));
         const matchU = !userF || item.fromUser === userF;
@@ -405,8 +430,12 @@ function renderNotifications() {
         
         return matchQ && matchU && matchO && matchR && matchS;
     });
+}
 
-    // Sort
+function renderNotifications() {
+    let filtered = applyTransFilters(localTransmittalsDB);
+
+    // Sorting
     filtered.sort((a, b) => {
         let valA = a[transSortState.field] || '';
         let valB = b[transSortState.field] || '';
@@ -426,13 +455,27 @@ function renderNotifications() {
 
     transCount.textContent = filtered.length;
 
-    if (filtered.length === 0) {
+    // Pagination Logic
+    const totalPages = Math.ceil(filtered.length / transPageSize) || 1;
+    if (transCurrentPage > totalPages) transCurrentPage = totalPages;
+
+    const start = (transCurrentPage - 1) * transPageSize;
+    const end = start + transPageSize;
+    const paginated = filtered.slice(start, end);
+
+    // Update Paging UI
+    document.getElementById('transCurrentPage').textContent = transCurrentPage;
+    document.getElementById('transTotalPages').textContent = totalPages;
+    document.getElementById('transPrev').disabled = (transCurrentPage <= 1);
+    document.getElementById('transNext').disabled = (transCurrentPage >= totalPages);
+
+    if (paginated.length === 0) {
         notifTableBody.innerHTML = `<tr><td colspan="7" class="px-6 py-12 text-center text-slate-500 italic">No se encontraron Transmittals con los filtros aplicados.</td></tr>`;
         return;
     }
 
     let html = '';
-    filtered.forEach(item => {
+    paginated.forEach(item => {
         const dateStr = item.date ? new Date(item.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A';
         const docInfo = item.docName ? `<span class="text-brand font-medium">${item.docName}</span> <span class="text-[10px] bg-slate-700 px-1.5 py-0.5 rounded text-slate-300 ml-1">${item.docRev}</span>` : '<span class="text-slate-500 italic">Sin adjunto</span>';
         const fileInfo = item.fileName ? `<div class="text-[10px] text-slate-500 mt-1"><i class="far fa-file-pdf mr-1"></i>${item.fileName}</div>` : '';
@@ -497,11 +540,34 @@ function updateTransFilterOptions() {
 }
 
 btnRefreshNotif.addEventListener('click', syncNotifications);
-filterTransSearch.addEventListener('input', renderNotifications);
-filterTransUser.addEventListener('change', renderNotifications);
-filterTransOrg.addEventListener('change', renderNotifications);
-filterTransRecipient.addEventListener('change', renderNotifications);
-filterTransStatus.addEventListener('change', renderNotifications);
+filterTransSearch.addEventListener('input', () => { transCurrentPage = 1; renderNotifications(); });
+filterTransUser.addEventListener('change', () => { transCurrentPage = 1; renderNotifications(); });
+filterTransOrg.addEventListener('change', () => { transCurrentPage = 1; renderNotifications(); });
+filterTransRecipient.addEventListener('change', () => { transCurrentPage = 1; renderNotifications(); });
+filterTransStatus.addEventListener('change', () => { transCurrentPage = 1; renderNotifications(); });
+
+// Pagination Listeners
+document.getElementById('docPrev').addEventListener('click', () => { if (docCurrentPage > 1) { docCurrentPage--; renderTable(); } });
+document.getElementById('docNext').addEventListener('click', () => { 
+    const totalPages = Math.ceil(applyFilters(localDB).length / docPageSize);
+    if (docCurrentPage < totalPages) { docCurrentPage++; renderTable(); } 
+});
+document.getElementById('docPagingSize').addEventListener('change', (e) => {
+    docPageSize = parseInt(e.target.value);
+    docCurrentPage = 1;
+    renderTable();
+});
+
+document.getElementById('transPrev').addEventListener('click', () => { if (transCurrentPage > 1) { transCurrentPage--; renderNotifications(); } });
+document.getElementById('transNext').addEventListener('click', () => { 
+    const totalPages = Math.ceil(applyTransFilters(localTransmittalsDB).length / transPageSize);
+    if (transCurrentPage < totalPages) { transCurrentPage++; renderNotifications(); } 
+});
+document.getElementById('transPagingSize').addEventListener('change', (e) => {
+    transPageSize = parseInt(e.target.value);
+    transCurrentPage = 1;
+    renderNotifications();
+});
 
 // ======================================
 // 5. Synchronization Orchestration
