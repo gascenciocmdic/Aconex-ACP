@@ -11,12 +11,30 @@ class SyncEngine {
     parseMailSearchMetadata(xmlString) {
         try {
             const xmlDoc = this.parser.parseFromString(xmlString, "text/xml");
-            const root = xmlDoc.documentElement;
+            const allElements = Array.from(xmlDoc.getElementsByTagName('*'));
+            
+            const findAttr = (attrNames) => {
+                for (const el of allElements) {
+                    for (const attrName of attrNames) {
+                        // Búsqueda insensible a mayúsculas en los atributos del elemento
+                        for (let i = 0; i < el.attributes.length; i++) {
+                            const a = el.attributes[i];
+                            if (a.name.toLowerCase() === attrName.toLowerCase()) return a.value;
+                        }
+                    }
+                }
+                return null;
+            };
+
+            const totalResults = findAttr(['TotalResults', 'TotalCount', 'totalResults']) || '0';
+            const onPage = findAttr(['TotalResultsOnPage', 'Count', 'onPage']) || '0';
+
             return {
-                totalResults: parseInt(root.getAttribute('TotalResults') || '0', 10),
-                onPage: parseInt(root.getAttribute('TotalResultsOnPage') || '0', 10)
+                totalResults: parseInt(totalResults, 10),
+                onPage: parseInt(onPage, 10)
             };
         } catch (e) {
+            console.warn("Error parseando metadatos Mail:", e);
             return { totalResults: 0, onPage: 0 };
         }
     }
@@ -255,12 +273,14 @@ class SyncEngine {
                 const metadata = this.parseMailSearchMetadata(xmlList);
                 totalResults = metadata.totalResults;
 
-                // Extraer IDs del XML de búsqueda
-                const xmlDoc = this.parser.parseFromString(xmlList, "text/xml");
-                const mailItems = xmlDoc.querySelectorAll('MailItem, Mail, MailHeader');
-                mailItems.forEach(item => {
-                    const id = item.getAttribute('MailId') || item.querySelector('MailId')?.textContent.trim();
-                    if (id && !allMailIds.includes(id)) allMailIds.push(id);
+                // Extraer IDs del XML de búsqueda de forma robusta (ignora namespaces)
+                const allElements = Array.from(xmlDoc.getElementsByTagName('*'));
+                allElements.forEach(item => {
+                    const baseName = item.nodeName.split(':').pop();
+                    if (['MailItem', 'Mail', 'MailHeader'].includes(baseName)) {
+                        const id = item.getAttribute('MailId') || item.querySelector('MailId')?.textContent.trim();
+                        if (id && !allMailIds.includes(id)) allMailIds.push(id);
+                    }
                 });
 
                 if (onProgress) onProgress(0, 0, `Obtenidos ${allMailIds.length} de ${totalResults} IDs...`);
