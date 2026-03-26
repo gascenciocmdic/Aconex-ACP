@@ -274,6 +274,7 @@ class SyncEngine {
                 totalResults = metadata.totalResults;
 
                 // Extraer IDs del XML de búsqueda de forma robusta (ignora namespaces)
+                const xmlDoc = this.parser.parseFromString(xmlList, "text/xml");
                 const allElements = Array.from(xmlDoc.getElementsByTagName('*'));
                 allElements.forEach(item => {
                     const baseName = item.nodeName.split(':').pop();
