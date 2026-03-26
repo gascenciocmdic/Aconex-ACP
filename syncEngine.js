@@ -162,16 +162,87 @@ class SyncEngine {
         return transmittals;
     }
 
+    parseTransmittalDetails(xmlString) {
+        try {
+            const xmlDoc = this.parser.parseFromString(xmlString, "text/xml");
+            const mailNode = xmlDoc.querySelector('Mail');
+            if (!mailNode) return null;
+
+            const getVal = (sel) => {
+                const el = mailNode.querySelector(sel);
+                return el ? el.textContent.trim() : '';
+            };
+
+            // 1. Datos Básicos solicitados por el usuario
+            const mailId = mailNode.getAttribute('MailId');
+            const mailNo = getVal('MailNumber') || getVal('MailNo');
+            const subject = getVal('Subject');
+            const date = getVal('DateSent') || getVal('SentDate');
+            const status = getVal('ApprovalStatus') || getVal('Status');
+
+            // 2. Destinatario (To -> User -> UserName) conforme a regla técnica
+            let toUser = 'S/D';
+            const toNode = mailNode.querySelector('To');
+            if (toNode) {
+                const userNodes = Array.from(toNode.querySelectorAll('User'));
+                const names = userNodes.map(u => u.querySelector('UserName')?.textContent.trim()).filter(Boolean);
+                if (names.length > 0) toUser = names.join(', ');
+                else {
+                    // Fallback para otros formatos posibles (ej. Recipient > Name)
+                    const altNames = Array.from(toNode.querySelectorAll('Recipient')).map(r => r.querySelector('Name')?.textContent.trim()).filter(Boolean);
+                    if (altNames.length > 0) toUser = altNames.join(', ');
+                }
+            }
+
+            // 3. Remitente (From -> User -> UserName)
+            let fromUser = 'S/N';
+            let fromOrg = 'S/O';
+            const fromNode = mailNode.querySelector('From');
+            if (fromNode) {
+                fromUser = fromNode.querySelector('User > UserName')?.textContent.trim() || 'S/R';
+                fromOrg = fromNode.querySelector('Organization > Name')?.textContent.trim() || 'S/O';
+            }
+
+            // 4. Adjuntos
+            const attachment = mailNode.querySelector('RegisteredDocumentAttachment');
+            let docName = '', docRev = '', fileName = '';
+            if (attachment) {
+                docName = attachment.querySelector('Title')?.textContent.trim() || '';
+                docRev = attachment.querySelector('Revision')?.textContent.trim() || '';
+                fileName = attachment.querySelector('FileName')?.textContent.trim() || '';
+            }
+
+            return {
+                id: mailId,
+                mailNo: mailNo,
+                subject: subject || '(Sin Asunto)',
+                fromUser: fromUser,
+                fromOrg: fromOrg,
+                toUser: toUser,
+                date: date,
+                status: status,
+                docName: docName,
+                docRev: docRev,
+                fileName: fileName,
+                isUnread: true
+            };
+        } catch (e) {
+            console.error("Error parseando detalle de transmittal:", e);
+            return null;
+        }
+    }
+
     async syncAllTransmittals(options = {}) {
         const { onProgress, status } = options;
         try {
-            const allHeaders = [];
+            const allMailIds = [];
             let startRow = 1;
             let totalResults = 0;
-            const pageSize = 500;
+            const pageSize = 250; // Solicitado: page_size=250
 
-            if (onProgress) onProgress(0, 0, "Buscando cabeceras...");
+            if (onProgress) onProgress(0, 0, "Buscando IDs de transmittals...");
 
+            // PASO 1: Obtener todos los MailId disponibles
             do {
                 const params = { 
                     mail_box: 'Inbox', 
@@ -184,47 +255,61 @@ class SyncEngine {
                 const metadata = this.parseMailSearchMetadata(xmlList);
                 totalResults = metadata.totalResults;
 
-                const headers = this.parseTransmittalsFromXml(xmlList);
-                allHeaders.push(...headers);
+                // Extraer IDs del XML de búsqueda
+                const xmlDoc = this.parser.parseFromString(xmlList, "text/xml");
+                const mailItems = xmlDoc.querySelectorAll('MailItem, Mail, MailHeader');
+                mailItems.forEach(item => {
+                    const id = item.getAttribute('MailId') || item.querySelector('MailId')?.textContent.trim();
+                    if (id && !allMailIds.includes(id)) allMailIds.push(id);
+                });
 
-                if (onProgress) onProgress(0, 0, `Obtenidas ${allHeaders.length} de ${totalResults} cabeceras...`);
+                if (onProgress) onProgress(0, 0, `Obtenidos ${allMailIds.length} de ${totalResults} IDs...`);
                 
-                if (metadata.totalOnPage === 0) break;
-                startRow += metadata.totalOnPage;
+                if (metadata.onPage === 0 || allMailIds.length >= totalResults) break;
+                startRow += metadata.onPage;
                 
-                // Pequeño delay entre páginas de búsqueda
                 if (startRow <= totalResults) await new Promise(r => setTimeout(r, 200));
 
-            } while (startRow <= totalResults && allHeaders.length < totalResults);
+            } while (startRow <= totalResults);
 
-            if (allHeaders.length === 0) return [];
-            
+            if (allMailIds.length === 0) return [];
+
+            // PASO 2: Extracción en Paralelo con Control de Flujo (Promise Pool)
             const fullDetails = [];
-            const total = allHeaders.length;
-            
-            // Paso 2: Obtener el detalle de CADA CORREO
-            for (let i = 0; i < total; i++) {
-                const header = allHeaders[i];
-                try {
-                    const xmlDetail = await this.client.fetchMailDetail(header.id);
-                    const parsed = this.parseTransmittalsFromXml(xmlDetail);
-                    if (parsed.length > 0) {
-                        fullDetails.push(parsed[0]);
-                    } else {
-                        fullDetails.push(header);
-                    }
-                } catch (e) {
-                    fullDetails.push(header);
-                }
+            const CONCURRENCY_LIMIT = 10;
+            const total = allMailIds.length;
+            let completedCount = 0;
 
-                if (onProgress) onProgress(i + 1, total, `Descargando detalles: ${i+1}/${total}`);
-                
-                // Pausa cada X registros para evitar 429
-                if (i % 5 === 0) await new Promise(r => setTimeout(r, 100));
+            const processBatch = async (ids) => {
+                return Promise.all(ids.map(async (mailId) => {
+                    try {
+                        const xmlDetail = await this.client.fetchMailDetail(mailId);
+                        const detail = this.parseTransmittalDetails(xmlDetail);
+                        if (detail) {
+                            fullDetails.push(detail);
+                        }
+                    } catch (e) {
+                        console.warn(`Error al obtener detalle mail ${mailId}:`, e.message);
+                    } finally {
+                        completedCount++;
+                        if (onProgress) onProgress(completedCount, total, `Procesando: ${completedCount}/${total} (${Math.round(completedCount/total*100)}%)`);
+                    }
+                }));
+            };
+
+            // Ejecutar en grupos de 10
+            for (let i = 0; i < allMailIds.length; i += CONCURRENCY_LIMIT) {
+                const batch = allMailIds.slice(i, i + CONCURRENCY_LIMIT);
+                await processBatch(batch);
+                // Pequeño reposo para el Rate Limit entre batches si es necesario
+                await new Promise(r => setTimeout(r, 100));
             }
 
-            return fullDetails;
+            // Ordenar por fecha descendente (más recientes primero)
+            return fullDetails.sort((a,b) => new Date(b.date) - new Date(a.date));
+
         } catch (e) {
+            console.error("Error en sincronización optimizada:", e);
             throw e;
         }
     }
