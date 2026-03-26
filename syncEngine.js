@@ -271,27 +271,39 @@ class SyncEngine {
 
                 const xmlList = await this.client.fetchMail(params);
                 const metadata = this.parseMailSearchMetadata(xmlList);
-                totalResults = metadata.totalResults;
+                
+                // Solo actualizar totalResults si el metadato es válido (>0)
+                if (metadata.totalResults > 0 && totalResults === 0) {
+                    totalResults = metadata.totalResults;
+                }
 
                 // Extraer IDs del XML de búsqueda de forma robusta (ignora namespaces)
                 const xmlDoc = this.parser.parseFromString(xmlList, "text/xml");
                 const allElements = Array.from(xmlDoc.getElementsByTagName('*'));
+                let itemsFoundInPage = 0;
                 allElements.forEach(item => {
                     const baseName = item.nodeName.split(':').pop();
                     if (['MailItem', 'Mail', 'MailHeader'].includes(baseName)) {
                         const id = item.getAttribute('MailId') || item.querySelector('MailId')?.textContent.trim();
-                        if (id && !allMailIds.includes(id)) allMailIds.push(id);
+                        if (id && !allMailIds.includes(id)) {
+                            allMailIds.push(id);
+                            itemsFoundInPage++;
+                        }
                     }
                 });
 
-                if (onProgress) onProgress(0, 0, `Obtenidos ${allMailIds.length} de ${totalResults} IDs...`);
+                if (onProgress) onProgress(0, 0, `Obtenidos ${allMailIds.length} de ${totalResults || '?'} IDs...`);
                 
-                if (metadata.onPage === 0 || allMailIds.length >= totalResults) break;
-                startRow += metadata.onPage;
+                // Si no hay más resultados o llegamos al total conocido, salir
+                if (itemsFoundInPage === 0 || (totalResults > 0 && allMailIds.length >= totalResults)) break;
                 
-                if (startRow <= totalResults) await new Promise(r => setTimeout(r, 200));
+                startRow += pageSize; // Usamos pageSize fijo (250) para el avance de 'start'
+                
+                if (startRow <= totalResults || totalResults === 0) {
+                    await new Promise(r => setTimeout(r, 200));
+                }
 
-            } while (startRow <= totalResults);
+            } while (startRow <= totalResults || (totalResults === 0 && allMailIds.length > 0));
 
             if (allMailIds.length === 0) return [];
 
