@@ -114,6 +114,7 @@ let selectedFilters = {
     revision: [],
     doc_type: []
 };
+let currentKPIFilter = null; // 'all', 'pending', 'revB', 'revP', 'cmdic', 'esed'
 
 // ======================================
 // 1. Navigation Logic
@@ -230,6 +231,7 @@ document.querySelectorAll('th[data-sort]').forEach(th => {
 });
 
 function applyFilters(data) {
+    const today = new Date();
     const query = filterSearch.value.toLowerCase().trim();
     const contractorF = filterContractor.value;
     const specialtyF = filterSpecialty.value;
@@ -246,9 +248,66 @@ function applyFilters(data) {
         const matchC = !contractorF || doc.author === contractorF;
         const matchSpec = !specialtyF || doc.specialty === specialtyF;
         
-        return matchQ && matchS && matchC && matchR && matchT && matchSpec;
+        // KPI Filter Logic
+        let matchKPI = true;
+        if (currentKPIFilter) {
+            const status = (doc.status || '').toLowerCase();
+            const rev = (doc.revision || '').toLowerCase();
+            const modDateRaw = doc.modified_date;
+            let businessDays = 0;
+            if (modDateRaw) {
+                const modDate = new Date(modDateRaw);
+                if (!isNaN(modDate.getTime())) businessDays = getBusinessDaysDiff(modDate, today);
+            }
+
+            if (currentKPIFilter === 'pending') {
+                matchKPI = status.includes('acción') || status.includes('pendiente') || status.includes('action');
+            } else if (currentKPIFilter === 'revB') {
+                matchKPI = rev === 'b';
+            } else if (currentKPIFilter === 'revP') {
+                matchKPI = rev === 'p' || rev === '0';
+            } else if (currentKPIFilter === 'cmdic') {
+                matchKPI = (status.includes('pendiente') || status.includes('acción')) && businessDays > 5;
+            } else if (currentKPIFilter === 'esed') {
+                const isAction = status.includes('acción') || status.includes('action');
+                const isFYI = status.includes('conocimiento') || status.includes('fyi');
+                const isCriticalRev = rev === 'b' || rev === 'c' || rev.startsWith('p');
+                matchKPI = (isAction && businessDays > 5) || (isFYI && isCriticalRev && businessDays > 5);
+            }
+        }
+        
+        return matchQ && matchS && matchC && matchR && matchT && matchSpec && matchKPI;
     });
 }
+
+function toggleKPIFilter(kpi) {
+    // Reset secondary filters when using KPI? User choice. Let's keep them and intersect.
+    if (currentKPIFilter === kpi) {
+        currentKPIFilter = null; // Unselect
+    } else {
+        currentKPIFilter = kpi;
+    }
+    
+    // UI Update visual feedback
+    document.querySelectorAll('.kpi-card').forEach(card => card.classList.remove('selected'));
+    if (currentKPIFilter) {
+        const idMap = {
+            'all': 'kpiCardAll',
+            'pending': 'kpiCardPending',
+            'revB': 'kpiCardRevB',
+            'revP': 'kpiCardRevP',
+            'cmdic': 'kpiCardCmdic',
+            'esed': 'kpiCardEsed'
+        };
+        const cardId = idMap[currentKPIFilter];
+        const card = document.getElementById(cardId);
+        if (card) card.classList.add('selected');
+    }
+    
+    docCurrentPage = 1;
+    renderTable();
+}
+window.toggleKPIFilter = toggleKPIFilter;
 
 function updateDashboardKPIs(data) {
     const today = new Date();
