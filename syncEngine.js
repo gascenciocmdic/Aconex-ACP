@@ -6,6 +6,7 @@ class SyncEngine {
         this.db = dbPool;
         this.client = new AconexClient(config.projectId, config.username, config.password, config.region || 'us1');
         this.parser = new DOMParser();
+        this.CONCURRENCY_LIMIT = 10;
     }
 
     parseMailSearchMetadata(xmlString) {
@@ -350,8 +351,8 @@ class SyncEngine {
             };
 
             // Ejecutar en grupos de 10
-            for (let i = 0; i < allMailIds.length; i += CONCURRENCY_LIMIT) {
-                const batch = allMailIds.slice(i, i + CONCURRENCY_LIMIT);
+            for (let i = 0; i < allMailIds.length; i += this.CONCURRENCY_LIMIT) {
+                const batch = allMailIds.slice(i, i + this.CONCURRENCY_LIMIT);
                 await processBatch(batch);
                 // Pequeño reposo para el Rate Limit entre batches si es necesario
                 await new Promise(r => setTimeout(r, 100));

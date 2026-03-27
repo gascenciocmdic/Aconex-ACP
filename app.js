@@ -30,14 +30,11 @@ const progressText = document.getElementById('progressText');
 const progressPercent = document.getElementById('progressPercent');
 const circuitBanner = document.getElementById('circuitBanner');
 
-// Table and Filters
+// Table and Filters (Note: Multi-selects are handled via initMultiSelect)
 const tableBody = document.getElementById('tableBody');
 const tblCount = document.getElementById('tblCount');
 const filterSearch = document.getElementById('filterSearch');
-const filterStatus = document.getElementById('filterStatus');
 const filterContractor = document.getElementById('filterContractor');
-const filterRev = document.getElementById('filterRev');
-const filterDocType = document.getElementById('filterDocType');
 const filterSpecialty = document.getElementById('filterSpecialty');
 const confPageSize = document.getElementById('confPageSize');
 
@@ -315,79 +312,84 @@ function updateDashboardKPIs(data) {
 }
 
 function renderTable() {
-    let filtered = applyFilters(localDB);
-    updateDashboardKPIs(localDB); 
+    try {
+        let filtered = applyFilters(localDB);
+        updateDashboardKPIs(localDB); 
 
-    // Sorting
-    filtered.sort((a, b) => {
-        let valA = a[sortState.field] || '';
-        let valB = b[sortState.field] || '';
-        
-        if (sortState.field === 'modified_date') {
-            valA = new Date(valA).getTime();
-            valB = new Date(valB).getTime();
-        } else {
-            valA = valA.toString().toLowerCase();
-            valB = valB.toString().toLowerCase();
-        }
-
-        if (valA < valB) return sortState.direction === 'asc' ? -1 : 1;
-        if (valA > valB) return sortState.direction === 'asc' ? 1 : -1;
-        return 0;
-    });
-
-    tblCount.textContent = filtered.length;
-
-    // Pagination Logic
-    const totalPages = Math.ceil(filtered.length / docPageSize) || 1;
-    if (docCurrentPage > totalPages) docCurrentPage = totalPages;
-    
-    const start = (docCurrentPage - 1) * docPageSize;
-    const end = start + docPageSize;
-    const paginated = filtered.slice(start, end);
-
-    // Update Paging UI
-    document.getElementById('docCurrentPage').textContent = docCurrentPage;
-    document.getElementById('docTotalPages').textContent = totalPages;
-    document.getElementById('docPrev').disabled = (docCurrentPage <= 1);
-    document.getElementById('docNext').disabled = (docCurrentPage >= totalPages);
-
-    if (paginated.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="9" class="px-6 py-8 text-center text-slate-500 italic">No se encontraron documentos con los filtros aplicados.</td></tr>`;
-        return;
-    }
-
-    let html = '';
-    paginated.forEach(doc => {
-        let displayDate = doc.modified_date;
-        if (displayDate) {
-            const date = new Date(displayDate);
-            if (!isNaN(date)) {
-                const day = String(date.getDate()).padStart(2, '0');
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const year = date.getFullYear();
-                displayDate = `${day}-${month}-${year}`;
+        // Sorting
+        filtered.sort((a, b) => {
+            let valA = a[sortState.field] || '';
+            let valB = b[sortState.field] || '';
+            
+            if (sortState.field === 'modified_date') {
+                valA = new Date(valA).getTime() || 0;
+                valB = new Date(valB).getTime() || 0;
+            } else {
+                valA = valA.toString().toLowerCase();
+                valB = valB.toString().toLowerCase();
             }
+
+            if (valA < valB) return sortState.direction === 'asc' ? -1 : 1;
+            if (valA > valB) return sortState.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        tblCount.textContent = filtered.length;
+
+        // Pagination Logic
+        const totalPages = Math.ceil(filtered.length / docPageSize) || 1;
+        if (docCurrentPage > totalPages) docCurrentPage = totalPages;
+        
+        const start = (docCurrentPage - 1) * docPageSize;
+        const end = start + docPageSize;
+        const paginated = filtered.slice(start, end);
+
+        // Update Paging UI
+        if (document.getElementById('docCurrentPage')) document.getElementById('docCurrentPage').textContent = docCurrentPage;
+        if (document.getElementById('docTotalPages')) document.getElementById('docTotalPages').textContent = totalPages;
+        if (document.getElementById('docPrev')) document.getElementById('docPrev').disabled = (docCurrentPage <= 1);
+        if (document.getElementById('docNext')) document.getElementById('docNext').disabled = (docCurrentPage >= totalPages);
+
+        if (paginated.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="9" class="px-6 py-8 text-center text-slate-500 italic">No se encontraron documentos con los filtros aplicados.</td></tr>`;
+            return;
         }
 
-        html += `
-            <tr class="hover:bg-slate-800/80 transition-colors border-b border-slate-700/30">
-                <td class="px-6 py-4 font-mono text-xs text-brand font-bold">${doc.docno}</td>
-                <td class="px-6 py-4 truncate max-w-[200px]" title="${doc.title}">${doc.title || 'S/T'}</td>
-                <td class="px-6 py-4 text-center font-semibold text-xs">${doc.revision || '-'}</td>
-                <td class="px-6 py-4">${getStatusBadge(doc.status)}</td>
-                <td class="px-6 py-4 text-xs text-slate-400">${displayDate || 'N/A'}</td>
-                <td class="px-6 py-4 text-xs text-slate-300">${doc.author || 'N/A'}</td>
-                <td class="px-6 py-4 text-xs font-medium">${doc.specialty || 'General'}</td>
-                <td class="px-6 py-4 text-xs text-slate-400 italic">${doc.doc_type || 'N/A'}</td>
-                <td class="px-6 py-4 text-xs text-slate-400">${doc.contract || ''}</td>
-            </tr>
-        `;
-    });
-    tableBody.innerHTML = html;
+        let html = '';
+        paginated.forEach(doc => {
+            let displayDate = doc.modified_date;
+            if (displayDate) {
+                const date = new Date(displayDate);
+                if (!isNaN(date)) {
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const year = date.getFullYear();
+                    displayDate = `${day}-${month}-${year}`;
+                }
+            }
+
+            html += `
+                <tr class="hover:bg-slate-800/80 transition-colors border-b border-slate-700/30">
+                    <td class="px-6 py-4 font-mono text-xs text-brand font-bold">${doc.docno}</td>
+                    <td class="px-6 py-4 truncate max-w-[200px]" title="${doc.title}">${doc.title || 'S/T'}</td>
+                    <td class="px-6 py-4 text-center font-semibold text-xs">${doc.revision || '-'}</td>
+                    <td class="px-6 py-4">${getStatusBadge(doc.status)}</td>
+                    <td class="px-6 py-4 text-xs text-slate-400">${displayDate || 'N/A'}</td>
+                    <td class="px-6 py-4 text-xs text-slate-300">${doc.author || 'N/A'}</td>
+                    <td class="px-6 py-4 text-xs font-medium">${doc.specialty || 'General'}</td>
+                    <td class="px-6 py-4 text-xs text-slate-400 italic">${doc.doc_type || 'N/A'}</td>
+                    <td class="px-6 py-4 text-xs text-slate-400">${doc.contract || ''}</td>
+                </tr>
+            `;
+        });
+        tableBody.innerHTML = html;
+    } catch (e) {
+        console.error("Error en renderTable:", e);
+    }
 }
 
-[filterSearch, filterStatus, filterContractor, filterRev, filterDocType, filterSpecialty].forEach(el => {
+[filterSearch, filterContractor, filterSpecialty].forEach(el => {
+    if (!el) return;
     el.addEventListener('change', () => { docCurrentPage = 1; renderTable(); });
     if(el.id === 'filterSearch') el.addEventListener('input', () => { docCurrentPage = 1; renderTable(); });
 });

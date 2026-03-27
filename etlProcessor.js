@@ -56,7 +56,8 @@ class AconexETLProcessor {
                 wbs: doc.wbs || '',
                 specialty: doc.specialty || '',
                 contract: processedContract,
-                author: doc.author || ''
+                author: doc.author || '',
+                doc_type: doc.doc_type || ''
             });
         }
 
