@@ -80,6 +80,45 @@ let transSortState = {
 };
 
 // ======================================
+// 0. Business Logic (Holidays & KPI Utils)
+// ======================================
+const CHILE_HOLIDAYS_2026 = [
+    '2026-01-01', '2026-04-03', '2026-04-04', '2026-05-01', '2026-05-21',
+    '2026-06-21', '2026-06-29', '2026-07-16', '2026-08-15', '2026-09-18',
+    '2026-09-19', '2026-10-12', '2026-10-31', '2026-11-01', '2026-12-08', '2026-12-25'
+];
+
+function isBusinessDay(date) {
+    const day = date.getDay();
+    if (day === 0 || day === 6) return false; // Sábado o Domingo
+    const dateStr = date.toISOString().split('T')[0];
+    return !CHILE_HOLIDAYS_2026.includes(dateStr);
+}
+
+function getBusinessDaysDiff(startDate, endDate) {
+    let count = 0;
+    let cur = new Date(startDate);
+    const end = new Date(endDate);
+    if (isNaN(cur.getTime()) || isNaN(end.getTime())) return 0;
+    
+    // Si la fecha de inicio es mayor, no hay atraso positivo en este contexto
+    if (cur > end) return 0;
+
+    while (cur < end) {
+        cur.setDate(cur.getDate() + 1);
+        if (isBusinessDay(cur)) count++;
+    }
+    return count;
+}
+
+// Multiselect State
+let selectedFilters = {
+    status: [],
+    revision: [],
+    doc_type: []
+};
+
+// ======================================
 // 1. Navigation Logic
 // ======================================
 tabs.forEach(tab => {
@@ -194,27 +233,90 @@ document.querySelectorAll('th[data-sort]').forEach(th => {
 });
 
 function applyFilters(data) {
-    const query = filterSearch.value.toLowerCase();
-    const statusF = filterStatus.value;
+    const query = filterSearch.value.toLowerCase().trim();
     const contractorF = filterContractor.value;
-    const revF = filterRev.value;
-    const docTypeF = filterDocType.value;
     const specialtyF = filterSpecialty.value;
 
     return data.filter(doc => {
         const matchQ = !query || (doc.docno && doc.docno.toLowerCase().includes(query)) || (doc.title && doc.title.toLowerCase().includes(query));
-        const matchS = !statusF || doc.status === statusF;
+        
+        // Multi-select matches
+        const matchS = selectedFilters.status.length === 0 || selectedFilters.status.includes(doc.status);
+        const matchR = selectedFilters.revision.length === 0 || selectedFilters.revision.includes(doc.revision);
+        const matchT = selectedFilters.doc_type.length === 0 || selectedFilters.doc_type.includes(doc.doc_type);
+        
+        // Single select matches
         const matchC = !contractorF || doc.author === contractorF;
-        const matchR = !revF || doc.revision === revF;
-        const matchT = !docTypeF || doc.doc_type === docTypeF;
         const matchSpec = !specialtyF || doc.specialty === specialtyF;
         
         return matchQ && matchS && matchC && matchR && matchT && matchSpec;
     });
 }
 
+function updateDashboardKPIs(data) {
+    const today = new Date();
+    const statusMap = {
+        total: data.length,
+        pending: 0,
+        revB: 0,
+        revP: 0,
+        delayedCMDIC: 0,
+        delayedESED: 0
+    };
+
+    data.forEach(doc => {
+        const status = (doc.status || '').toLowerCase();
+        const rev = (doc.revision || '').toLowerCase();
+        const modDateRaw = doc.modified_date;
+        let businessDays = 0;
+        
+        if (modDateRaw) {
+            const modDate = new Date(modDateRaw);
+            if (!isNaN(modDate.getTime())) {
+                businessDays = getBusinessDaysDiff(modDate, today);
+            }
+        }
+
+        // 1. Pendientes
+        if (status.includes('acción') || status.includes('pendiente') || status.includes('action')) {
+            statusMap.pending++;
+        }
+
+        // 2. Rev B / b
+        if (rev === 'b') statusMap.revB++;
+
+        // 3. Rev P / p / 0
+        if (rev === 'p' || rev === '0') statusMap.revP++;
+
+        // 4. CMDIC Atrasados
+        if ((status.includes('pendiente') || status.includes('acción')) && businessDays > 5) {
+            statusMap.delayedCMDIC++;
+        }
+
+        // 5. ESED Atrasados
+        const isAction = status.includes('acción') || status.includes('action');
+        const isFYI = status.includes('conocimiento') || status.includes('fyi');
+        const isCriticalRev = rev === 'b' || rev === 'c' || rev.startsWith('p');
+
+        if (isAction && businessDays > 5) {
+            statusMap.delayedESED++;
+        } else if (isFYI && isCriticalRev && businessDays > 5) {
+            statusMap.delayedESED++;
+        }
+    });
+
+    // Update UI
+    document.getElementById('kpiTotal').textContent = statusMap.total;
+    document.getElementById('kpiPending').textContent = statusMap.pending;
+    document.getElementById('kpiRevB').textContent = statusMap.revB;
+    document.getElementById('kpiRevP').textContent = statusMap.revP;
+    document.getElementById('kpiDelayedCMDIC').textContent = statusMap.delayedCMDIC;
+    document.getElementById('kpiDelayedESED').textContent = statusMap.delayedESED;
+}
+
 function renderTable() {
     let filtered = applyFilters(localDB);
+    updateDashboardKPIs(localDB); 
 
     // Sorting
     filtered.sort((a, b) => {
@@ -290,17 +392,73 @@ function renderTable() {
     if(el.id === 'filterSearch') el.addEventListener('input', () => { docCurrentPage = 1; renderTable(); });
 });
 
+// ======================================
+// 3. Multi-select Controller
+// ======================================
+function initMultiSelect(containerId, menuId, key, label) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const button = container.querySelector('button');
+    const menu = document.getElementById(menuId);
+
+    // Toggle menu
+    button.onclick = (e) => {
+        e.stopPropagation();
+        const isActive = menu.classList.contains('active');
+        // Cerrar otros
+        document.querySelectorAll('.multiselect-menu').forEach(m => m.classList.remove('active'));
+        if (!isActive) menu.classList.add('active');
+    };
+
+    // Close on click outside
+    document.addEventListener('click', (e) => {
+        if (!container.contains(e.target)) menu.classList.remove('active');
+    });
+
+    // Update choices
+    const updateSelections = () => {
+        const checked = Array.from(menu.querySelectorAll('input:checked')).map(i => i.value);
+        selectedFilters[key] = checked;
+        
+        // Update button text
+        const span = button.querySelector('span');
+        if (checked.length === 0) {
+            span.textContent = `${label} (Todos)`;
+        } else if (checked.length === 1) {
+            span.textContent = checked[0];
+        } else {
+            span.textContent = `${checked.length} selecc.`;
+        }
+        
+        docCurrentPage = 1;
+        renderTable();
+    };
+
+    // Inyectar opciones dinámicas
+    const values = [...new Set(localDB.map(d => d[key]).filter(Boolean))].sort();
+    menu.innerHTML = values.map((val, idx) => `
+        <div class="multiselect-option">
+            <input type="checkbox" id="chk-${key}-${idx}" value="${val}" ${selectedFilters[key].includes(val) ? 'checked' : ''}>
+            <label for="chk-${key}-${idx}">${val}</label>
+        </div>
+    `).join('');
+
+    // Attach events to checkboxes
+    menu.querySelectorAll('input').forEach(chk => {
+        chk.onchange = updateSelections;
+    });
+}
+
 function updateFilterOptions() {
-    const fields = [
-        { id: 'filterStatus', key: 'status', label: 'Estatus' },
+    // 1. Single Selects
+    const singleFields = [
         { id: 'filterContractor', key: 'author', label: 'Contratista' },
-        { id: 'filterRev', key: 'revision', label: 'Rev' },
-        { id: 'filterDocType', key: 'doc_type', label: 'Tipo Doc' },
         { id: 'filterSpecialty', key: 'specialty', label: 'Disciplina' }
     ];
 
-    fields.forEach(f => {
+    singleFields.forEach(f => {
         const el = document.getElementById(f.id);
+        if (!el) return;
         const currentVal = el.value;
         const uniqueValues = [...new Set(localDB.map(d => d[f.key]).filter(v => v))].sort();
         
@@ -310,6 +468,11 @@ function updateFilterOptions() {
         });
         el.innerHTML = html;
     });
+
+    // 2. Multi Selects
+    initMultiSelect('containerStatus', 'menuStatus', 'status', 'Estatus');
+    initMultiSelect('containerRev', 'menuRev', 'revision', 'Rev');
+    initMultiSelect('containerDocType', 'menuDocType', 'doc_type', 'Tipo Doc');
 }
 
 // Transmittal Filters & Sorting

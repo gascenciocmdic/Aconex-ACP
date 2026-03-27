@@ -67,3 +67,66 @@ body {
 .badge-danger { background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); }
 /* Gray/Default */
 .badge-neutral { background: rgba(148, 163, 184, 0.1); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.2); }
+
+/* KPI Grid */
+.kpi-card {
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(12px);
+    transition: all 0.3s ease;
+}
+.kpi-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(59, 130, 246, 0.5);
+    background: rgba(30, 41, 59, 0.8);
+}
+
+/* Multi-select Dropdown */
+.multiselect-container {
+    position: relative;
+    width: 100%;
+}
+.multiselect-button {
+    width: 100%;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.multiselect-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    background: #1e293b;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.5rem;
+    margin-top: 0.25rem;
+    max-height: 300px;
+    overflow-y: auto;
+    display: none;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+}
+.multiselect-menu.active {
+    display: block;
+}
+.multiselect-option {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.multiselect-option:hover {
+    background: rgba(59, 130, 246, 0.1);
+}
+.multiselect-option input {
+    margin-right: 0.75rem;
+    cursor: pointer;
+}
+.multiselect-option label {
+    cursor: pointer;
+    flex-grow: 1;
+    font-size: 0.875rem;
+}

@@ -16,7 +16,6 @@ class SyncEngine {
             const findAttr = (attrNames) => {
                 for (const el of allElements) {
                     for (const attrName of attrNames) {
-                        // Búsqueda insensible a mayúsculas en los atributos del elemento
                         for (let i = 0; i < el.attributes.length; i++) {
                             const a = el.attributes[i];
                             if (a.name.toLowerCase() === attrName.toLowerCase()) return a.value;
@@ -37,6 +36,24 @@ class SyncEngine {
             console.warn("Error parseando metadatos Mail:", e);
             return { totalResults: 0, onPage: 0 };
         }
+    }
+
+    findNodeByBaseName(parent, baseName) {
+        if (!parent) return null;
+        const children = Array.from(parent.children || parent.childNodes);
+        return children.find(c => c.nodeType === 1 && c.nodeName.split(':').pop() === baseName);
+    }
+
+    findNodesByBaseName(parent, baseName) {
+        if (!parent) return [];
+        // Búsqueda en todos los descendientes que coincidan con el nombre base
+        const all = Array.from(parent.getElementsByTagName('*'));
+        return all.filter(c => c.nodeName.split(':').pop() === baseName);
+    }
+
+    getValByBaseName(parent, baseName) {
+        const node = this.findNodeByBaseName(parent, baseName);
+        return node ? node.textContent.trim() : '';
     }
 
     parseTotalPages(xmlString) {
@@ -183,51 +200,47 @@ class SyncEngine {
     parseTransmittalDetails(xmlString) {
         try {
             const xmlDoc = this.parser.parseFromString(xmlString, "text/xml");
-            const mailNode = xmlDoc.querySelector('Mail');
+            const mailNode = this.findNodeByBaseName(xmlDoc, 'Mail');
             if (!mailNode) return null;
 
-            const getVal = (sel) => {
-                const el = mailNode.querySelector(sel);
-                return el ? el.textContent.trim() : '';
-            };
-
-            // 1. Datos Básicos solicitados por el usuario
+            // 1. Datos Básicos con búsqueda robusta
             const mailId = mailNode.getAttribute('MailId');
-            const mailNo = getVal('MailNumber') || getVal('MailNo');
-            const subject = getVal('Subject');
-            const date = getVal('DateSent') || getVal('SentDate');
-            const status = getVal('ApprovalStatus') || getVal('Status');
+            const mailNo = this.getValByBaseName(mailNode, 'MailNumber') || this.getValByBaseName(mailNode, 'MailNo');
+            const subject = this.getValByBaseName(mailNode, 'Subject');
+            const date = this.getValByBaseName(mailNode, 'DateSent') || this.getValByBaseName(mailNode, 'SentDate');
+            const status = this.getValByBaseName(mailNode, 'ApprovalStatus') || this.getValByBaseName(mailNode, 'Status');
 
-            // 2. Destinatario (To -> User -> UserName) conforme a regla técnica
+            // 2. Destinatario (To -> User -> UserName)
             let toUser = 'S/D';
-            const toNode = mailNode.querySelector('To');
+            const toNode = this.findNodeByBaseName(mailNode, 'To');
             if (toNode) {
-                const userNodes = Array.from(toNode.querySelectorAll('User'));
-                const names = userNodes.map(u => u.querySelector('UserName')?.textContent.trim()).filter(Boolean);
+                const userNodes = this.findNodesByBaseName(toNode, 'User');
+                const names = userNodes.map(u => this.getValByBaseName(u, 'UserName')).filter(Boolean);
                 if (names.length > 0) toUser = names.join(', ');
                 else {
-                    // Fallback para otros formatos posibles (ej. Recipient > Name)
-                    const altNames = Array.from(toNode.querySelectorAll('Recipient')).map(r => r.querySelector('Name')?.textContent.trim()).filter(Boolean);
+                    const altNames = this.findNodesByBaseName(toNode, 'Recipient').map(r => this.getValByBaseName(r, 'Name')).filter(Boolean);
                     if (altNames.length > 0) toUser = altNames.join(', ');
                 }
             }
 
-            // 3. Remitente (From -> User -> UserName)
+            // 3. Remitente (From -> User -> UserName / Organization -> Name)
             let fromUser = 'S/N';
             let fromOrg = 'S/O';
-            const fromNode = mailNode.querySelector('From');
+            const fromNode = this.findNodeByBaseName(mailNode, 'From');
             if (fromNode) {
-                fromUser = fromNode.querySelector('User > UserName')?.textContent.trim() || 'S/R';
-                fromOrg = fromNode.querySelector('Organization > Name')?.textContent.trim() || 'S/O';
+                const userNode = this.findNodeByBaseName(fromNode, 'User');
+                const orgNode = this.findNodeByBaseName(fromNode, 'Organization');
+                fromUser = this.getValByBaseName(userNode, 'UserName') || 'S/N';
+                fromOrg = this.getValByBaseName(orgNode, 'Name') || 'S/O';
             }
 
             // 4. Adjuntos
-            const attachment = mailNode.querySelector('RegisteredDocumentAttachment');
+            const attachment = this.findNodeByBaseName(mailNode, 'RegisteredDocumentAttachment');
             let docName = '', docRev = '', fileName = '';
             if (attachment) {
-                docName = attachment.querySelector('Title')?.textContent.trim() || '';
-                docRev = attachment.querySelector('Revision')?.textContent.trim() || '';
-                fileName = attachment.querySelector('FileName')?.textContent.trim() || '';
+                docName = this.getValByBaseName(attachment, 'Title');
+                docRev = this.getValByBaseName(attachment, 'Revision');
+                fileName = this.getValByBaseName(attachment, 'FileName');
             }
 
             return {
@@ -245,7 +258,7 @@ class SyncEngine {
                 isUnread: true
             };
         } catch (e) {
-            console.error("Error parseando detalle de transmittal:", e);
+            console.error("Error parseando detalle de transmittal robusto:", e);
             return null;
         }
     }
@@ -318,8 +331,14 @@ class SyncEngine {
                     try {
                         const xmlDetail = await this.client.fetchMailDetail(mailId);
                         const detail = this.parseTransmittalDetails(xmlDetail);
+                        
+                        // FILTRO "TRN": Solo incluir si el MailNo contiene "TRN"
                         if (detail) {
-                            fullDetails.push(detail);
+                            if (detail.mailNo?.toString().includes('TRN')) {
+                                fullDetails.push(detail);
+                            } else {
+                                console.log(`Skipping non-TRN mail: ${detail.mailNo}`);
+                            }
                         }
                     } catch (e) {
                         console.warn(`Error al obtener detalle mail ${mailId}:`, e.message);

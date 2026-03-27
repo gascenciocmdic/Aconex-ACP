@@ -93,6 +93,70 @@
                 <span class="text-red-400 font-medium">Sincronización Bloqueada: El Circuit Breaker (Sentinel) detuvo la extracción debido a 2 fallos consecutivos de autenticación. Revisa el Panel Admin.</span>
             </div>
 
+            <!-- Dashboard KPIs -->
+            <div class="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
+                <!-- Total -->
+                <div class="kpi-card p-4 rounded-xl">
+                    <span class="text-slate-400 text-[10px] font-bold uppercase tracking-wider block mb-1">Total Documentos</span>
+                    <div class="flex items-center justify-between">
+                        <span id="kpiTotal" class="text-2xl font-bold text-white">0</span>
+                        <div class="h-8 w-8 bg-blue-500/10 rounded-lg flex items-center justify-center text-blue-400">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <!-- Pendientes -->
+                <div class="kpi-card p-4 rounded-xl border-l-4 border-l-yellow-500">
+                    <span class="text-slate-400 text-[10px] font-bold uppercase tracking-wider block mb-1">Pendientes</span>
+                    <div class="flex items-center justify-between">
+                        <span id="kpiPending" class="text-2xl font-bold text-white">0</span>
+                        <div class="h-8 w-8 bg-yellow-500/10 rounded-lg flex items-center justify-center text-yellow-400">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <!-- Rev B -->
+                <div class="kpi-card p-4 rounded-xl">
+                    <span class="text-slate-400 text-[10px] font-bold uppercase tracking-wider block mb-1">Rev B / b</span>
+                    <div class="flex items-center justify-between">
+                        <span id="kpiRevB" class="text-2xl font-bold text-white">0</span>
+                        <div class="h-8 w-8 bg-cyan-500/10 rounded-lg flex items-center justify-center text-cyan-400">
+                            <span class="font-bold text-xs text-cyan-400">B</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Rev P / 0 -->
+                <div class="kpi-card p-4 rounded-xl">
+                    <span class="text-slate-400 text-[10px] font-bold uppercase tracking-wider block mb-1">Rev P / 0</span>
+                    <div class="flex items-center justify-between">
+                        <span id="kpiRevP" class="text-2xl font-bold text-white">0</span>
+                        <div class="h-8 w-8 bg-purple-500/10 rounded-lg flex items-center justify-center text-purple-400">
+                            <span class="font-bold text-xs text-purple-400">P</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- CMDIC Atrasados -->
+                <div class="kpi-card p-4 rounded-xl border-l-4 border-l-red-500">
+                    <span class="text-slate-400 text-[10px] font-bold uppercase tracking-wider block mb-1">Atrasados CMDIC</span>
+                    <div class="flex items-center justify-between">
+                        <span id="kpiDelayedCMDIC" class="text-2xl font-bold text-red-400">0</span>
+                        <div class="h-8 w-8 bg-red-500/10 rounded-lg flex items-center justify-center text-red-500">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <!-- ESED Atrasados -->
+                <div class="kpi-card p-4 rounded-xl border-l-4 border-l-orange-500">
+                    <span class="text-slate-400 text-[10px] font-bold uppercase tracking-wider block mb-1">Atrasados ESED</span>
+                    <div class="flex items-center justify-between">
+                        <span id="kpiDelayedESED" class="text-2xl font-bold text-orange-400">0</span>
+                        <div class="h-8 w-8 bg-orange-500/10 rounded-lg flex items-center justify-center text-orange-500">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Advanced Filters Row -->
             <div class="glass-card mb-6 p-4 rounded-xl space-y-4">
                 <div class="flex flex-col md:flex-row gap-4 items-center">
@@ -108,18 +172,37 @@
                 </div>
                 
                 <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-                    <select id="filterStatus" class="bg-slate-800/50 border border-slate-600 rounded-lg py-1.5 px-3 text-xs text-white focus:ring-1 focus:ring-brand appearance-none">
-                        <option value="">Estatus (Todos)</option>
-                    </select>
+                    <!-- Estatus (Multi) -->
+                    <div class="multiselect-container" id="containerStatus">
+                        <button type="button" class="multiselect-button bg-slate-800/50 border border-slate-600 rounded-lg py-1.5 px-3 text-xs text-white focus:ring-1 focus:ring-brand">
+                            <span class="truncate">Estatus (Todos)</span>
+                            <svg class="h-3 w-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <div class="multiselect-menu" id="menuStatus"></div>
+                    </div>
+                    
                     <select id="filterContractor" class="bg-slate-800/50 border border-slate-600 rounded-lg py-1.5 px-3 text-xs text-white focus:ring-1 focus:ring-brand appearance-none">
                         <option value="">Contratista (Todos)</option>
                     </select>
-                    <select id="filterRev" class="bg-slate-800/50 border border-slate-600 rounded-lg py-1.5 px-3 text-xs text-white focus:ring-1 focus:ring-brand appearance-none">
-                        <option value="">Rev (Todas)</option>
-                    </select>
-                    <select id="filterDocType" class="bg-slate-800/50 border border-slate-600 rounded-lg py-1.5 px-3 text-xs text-white focus:ring-1 focus:ring-brand appearance-none">
-                        <option value="">Tipo Doc (Todos)</option>
-                    </select>
+                    
+                    <!-- Revisión (Multi) -->
+                    <div class="multiselect-container" id="containerRev">
+                        <button type="button" class="multiselect-button bg-slate-800/50 border border-slate-600 rounded-lg py-1.5 px-3 text-xs text-white focus:ring-1 focus:ring-brand">
+                            <span class="truncate">Rev (Todas)</span>
+                            <svg class="h-3 w-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <div class="multiselect-menu" id="menuRev"></div>
+                    </div>
+
+                    <!-- Tipo Doc (Multi) -->
+                    <div class="multiselect-container" id="containerDocType">
+                        <button type="button" class="multiselect-button bg-slate-800/50 border border-slate-600 rounded-lg py-1.5 px-3 text-xs text-white focus:ring-1 focus:ring-brand">
+                            <span class="truncate">Tipo Doc (Todos)</span>
+                            <svg class="h-3 w-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <div class="multiselect-menu" id="menuDocType"></div>
+                    </div>
+
                     <select id="filterSpecialty" class="bg-slate-800/50 border border-slate-600 rounded-lg py-1.5 px-3 text-xs text-white focus:ring-1 focus:ring-brand appearance-none">
                         <option value="">Disciplina (Todas)</option>
                     </select>
