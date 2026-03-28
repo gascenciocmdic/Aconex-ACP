@@ -57,8 +57,12 @@ let isSyncing = false;
 // Pagination State
 let docCurrentPage = 1;
 let docPageSize = 50;
+let transSortState = { field: 'date', direction: 'desc' };
 let transCurrentPage = 1;
-let transPageSize = 50;
+const transPageSize = 50; 
+let hasNextTransPage = false;
+let isTransLoading = false;
+let transSearchTimeout = null;
 let globalConfig = {
     projectId: confProjectId.value,
     region: confRegion.value,
@@ -69,11 +73,6 @@ let globalConfig = {
 let sortState = {
     field: 'docno',
     direction: 'asc' // asc, desc
-};
-
-let transSortState = {
-    field: 'date',
-    direction: 'desc'
 };
 
 // ======================================
@@ -536,247 +535,158 @@ function updateFilterOptions() {
     initMultiSelect('containerDocType', 'menuDocType', 'doc_type', 'Tipo Doc');
 }
 
-// Transmittal Filters & Sorting
-[filterTransSearch, filterTransUser, filterTransOrg].forEach(el => {
-    el.addEventListener('change', renderNotifications);
-    if(el.id === 'filterTransSearch') el.addEventListener('input', renderNotifications);
-});
-
-function handleTransSort(field) {
-    if (transSortState.field === field) {
-        transSortState.direction = transSortState.direction === 'asc' ? 'desc' : 'asc';
-    } else {
-        transSortState.field = field;
-        transSortState.direction = 'asc';
-    }
-    
-    document.querySelectorAll('th[data-sort-trans] .sort-icon').forEach(icon => {
-        icon.textContent = '↕';
-        icon.classList.add('opacity-30');
-    });
-    const activeHeader = document.querySelector(`th[data-sort-trans="${field}"]`);
-    if (activeHeader) {
-        const icon = activeHeader.querySelector('.sort-icon');
-        icon.textContent = transSortState.direction === 'asc' ? '↑' : '↓';
-        icon.classList.remove('opacity-30');
-        icon.classList.add('opacity-100');
-    }
-
-    renderNotifications();
-}
-
-document.querySelectorAll('th[data-sort-trans]').forEach(th => {
-    th.addEventListener('click', () => handleTransSort(th.dataset.sortTrans));
-});
-
 // ======================================
 // 4. Notifications Engine
 // ======================================
-async function syncNotifications() {
-    // Aseguramos que los valores estén actualizados desde el form (o Admin Panel)
+// ======================================
+// 4. Notifications Engine (Senior UX)
+// ======================================
+async function syncNotifications(isLoadMore = false) {
+    if (isTransLoading) return;
+
+    // Actualizar configuración desde UI
     globalConfig.projectId = confProjectId.value.trim();
     globalConfig.region = confRegion.value;
     globalConfig.username = confUser.value.trim();
     globalConfig.password = confPass.value.trim();
 
     if (!globalConfig.username || !globalConfig.password) {
-        alert("Por favor, ingresa tus credenciales en el Panel Admin antes de extraer Transmittals.");
-        tabs[1].click(); // Redirigir a Admin
+        alert("Credenciales requeridas en Panel Admin.");
+        tabs[1].click();
         return;
     }
 
-    const originalText = btnRefreshNotif.innerHTML;
-    btnRefreshNotif.innerHTML = `<span class="animate-spin inline-block w-3.5 h-3.5 border-2 border-slate-500 border-t-white rounded-full"></span> Extrayendo...`;
-    btnRefreshNotif.disabled = true;
-    
-    notifTableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-slate-500 italic"><span class="animate-pulse">Consultando todos los Transmittals de Aconex...</span></td></tr>`;
+    if (!isLoadMore) {
+        transCurrentPage = 1;
+        localTransmittalsDB = [];
+        const grid = document.getElementById('notifCardGrid');
+        if (grid) grid.innerHTML = '';
+        document.getElementById('notifEmptyState').classList.add('hidden');
+    } else {
+        transCurrentPage++;
+    }
 
+    isTransLoading = true;
+    btnRefreshNotif.disabled = true;
+    const skeleton = document.getElementById('notifSkeletonContainer');
+    const loadMoreCont = document.getElementById('notifLoadMoreContainer');
     
+    if (skeleton) skeleton.classList.remove('hidden');
+    if (loadMoreCont) loadMoreCont.classList.add('hidden');
+
     const engine = new SyncEngine(null, globalConfig);
+    
     try {
-        localTransmittalsDB = []; // Resetear para carga incremental limpia
+        const result = await engine.fetchTransmittalBatch({
+            page: transCurrentPage,
+            pageSize: transPageSize,
+            status: (document.getElementById('filterTransUnread')?.checked) ? 'Unread' : null
+        });
+
+        localTransmittalsDB = isLoadMore ? [...localTransmittalsDB, ...result.data] : result.data;
+        hasNextTransPage = result.hasNextPage;
         
-        const syncOptions = {
-            onProgress: (done, total, msg) => {
-                const displayMsg = msg || `Descargando detalles... ${done} de ${total}`;
-                if (techLog) techLog.value += `\r[SYNC] ${displayMsg}`;
-                // No pisamos el renderizado incremental con el spinner si ya hay datos
-                if (localTransmittalsDB.length === 0) {
-                    notifTableBody.innerHTML = `<tr><td colspan="7" class="px-6 py-12 text-center text-slate-500 italic"><span class="animate-pulse">${displayMsg}</span></td></tr>`;
-                }
-            },
-            onTransmittalUpsert: async (item) => {
-                localTransmittalsDB.push(item);
-                // Renderizado incremental (throttled por la naturaleza de las promesas paralelas)
-                renderNotifications();
-                updateTransFilterOptions();
-            }
-        };
+        const countEl = document.getElementById('transCount');
+        if (countEl) countEl.textContent = localTransmittalsDB.length;
         
-        if (filterTransUnread && filterTransUnread.checked) {
-            syncOptions.status = 'Unread';
+        renderNotifications();
+        updateTransFilterOptions();
+        
+        if (hasNextTransPage && loadMoreCont) {
+            loadMoreCont.classList.remove('hidden');
+            const pageCounter = document.getElementById('transPageCounter');
+            if (pageCounter) pageCounter.textContent = `Página ${transCurrentPage}`;
         }
 
-        await engine.syncAllTransmittals(syncOptions);
-
-        // Ocultar badge al ver las notificaciones (limpiar estado)
-        notifBadge.classList.add('hidden'); 
+        if (localTransmittalsDB.length === 0 && !hasNextTransPage) {
+            document.getElementById('notifEmptyState').classList.remove('hidden');
+        }
     } catch (e) {
-        console.error("Error en syncNotifications:", e);
-        // Mostramos el error detallado (que ahora incluye el cuerpo de la respuesta de Aconex)
-        notifTableBody.innerHTML = `
-            <tr>
-                <td colspan="4" class="px-6 py-12 text-center text-red-500 border border-red-500/20 bg-red-500/5">
-                    <div class="font-bold mb-2">Error de la API (400/500):</div>
-                    <div class="text-xs font-mono bg-slate-900 p-3 rounded border border-slate-700 max-w-xl mx-auto overflow-auto text-left">
-                        ${e.message}
-                    </div>
-                    <div class="mt-4 text-xs text-slate-400">
-                        Sugerencia: Verifica que el ID del proyecto sea correcto para la región seleccionada.
-                    </div>
-                </td>
-            </tr>`;
+        console.error("Error Senior UX Sync:", e);
+        const grid = document.getElementById('notifCardGrid');
+        if (grid) {
+            grid.innerHTML = `<div class="col-span-full p-6 bg-red-500/10 text-red-500 rounded-xl border border-red-500/20 text-xs font-mono">${e.message}</div>`;
+        }
     } finally {
-        btnRefreshNotif.innerHTML = originalText;
+        isTransLoading = false;
         btnRefreshNotif.disabled = false;
+        if (skeleton) skeleton.classList.add('hidden');
     }
-}
-
-function applyTransFilters(data) {
-    const query = filterTransSearch.value.toLowerCase();
-    const userF = filterTransUser.value;
-    const orgF = filterTransOrg.value;
-    const recipientF = filterTransRecipient.value;
-    const statusF = filterTransStatus.value;
-
-    return data.filter(item => {
-        const matchQ = !query || 
-                      (item.subject && item.subject.toLowerCase().includes(query)) || 
-                      (item.fromUser && item.fromUser.toLowerCase().includes(query)) ||
-                      (item.mailNo && item.mailNo.toLowerCase().includes(query)) ||
-                      (item.toUser && item.toUser.toLowerCase().includes(query));
-        const matchU = !userF || item.fromUser === userF;
-        const matchO = !orgF || item.fromOrg === orgF;
-        const matchR = !recipientF || (item.toUser && item.toUser.includes(recipientF));
-        const matchS = !statusF || item.status === statusF;
-        
-        return matchQ && matchU && matchO && matchR && matchS;
-    });
 }
 
 function renderNotifications() {
-    let filtered = applyTransFilters(localTransmittalsDB);
+    const query = filterTransSearch.value.toLowerCase();
+    const orgF = filterTransOrg.value;
+    const grid = document.getElementById('notifCardGrid');
+    if (!grid) return;
 
-    // Sorting
-    filtered.sort((a, b) => {
-        let valA = a[transSortState.field] || '';
-        let valB = b[transSortState.field] || '';
-        
-        if (transSortState.field === 'date') {
-            valA = new Date(valA).getTime();
-            valB = new Date(valB).getTime();
-        } else {
-            valA = valA.toString().toLowerCase();
-            valB = valB.toString().toLowerCase();
-        }
-
-        if (valA < valB) return transSortState.direction === 'asc' ? -1 : 1;
-        if (valA > valB) return transSortState.direction === 'asc' ? 1 : -1;
-        return 0;
+    const filtered = localTransmittalsDB.filter(item => {
+        const matchQ = !query || (
+            item.subject?.toLowerCase().includes(query) || 
+            item.fromUser?.toLowerCase().includes(query) || 
+            item.mailNo?.toLowerCase().includes(query)
+        );
+        const matchO = !orgF || item.fromOrg === orgF;
+        return matchQ && matchO;
     });
 
-    transCount.textContent = filtered.length;
-
-    // Pagination Logic
-    const totalPages = Math.ceil(filtered.length / transPageSize) || 1;
-    if (transCurrentPage > totalPages) transCurrentPage = totalPages;
-
-    const start = (transCurrentPage - 1) * transPageSize;
-    const end = start + transPageSize;
-    const paginated = filtered.slice(start, end);
-
-    // Update Paging UI
-    document.getElementById('transCurrentPage').textContent = transCurrentPage;
-    document.getElementById('transTotalPages').textContent = totalPages;
-    document.getElementById('transPrev').disabled = (transCurrentPage <= 1);
-    document.getElementById('transNext').disabled = (transCurrentPage >= totalPages);
-
-    if (paginated.length === 0) {
-        notifTableBody.innerHTML = `<tr><td colspan="7" class="px-6 py-12 text-center text-slate-500 italic">No se encontraron Transmittals con los filtros aplicados.</td></tr>`;
+    if (filtered.length === 0 && !isTransLoading) {
+        grid.innerHTML = (localTransmittalsDB.length > 0) ? 
+            `<div class="col-span-full py-12 text-center text-slate-500 italic">No hay coincidencias con los filtros aplicados.</div>` : '';
         return;
     }
 
-    let html = '';
-    paginated.forEach(item => {
-        const dateStr = item.date ? new Date(item.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A';
-        const docInfo = item.docName ? `<span class="text-brand font-medium">${item.docName}</span> <span class="text-[10px] bg-slate-700 px-1.5 py-0.5 rounded text-slate-300 ml-1">${item.docRev}</span>` : '<span class="text-slate-500 italic">Sin adjunto</span>';
-        const fileInfo = item.fileName ? `<div class="text-[10px] text-slate-500 mt-1"><i class="far fa-file-pdf mr-1"></i>${item.fileName}</div>` : '';
-
-        html += `
-            <tr class="hover:bg-slate-800/80 transition-colors border-b border-slate-700/30">
-                <td class="px-6 py-4 text-xs font-mono text-slate-400">${dateStr}</td>
-                <td class="px-6 py-4 font-medium text-slate-200">${item.mailNo || item.id}</td>
-                <td class="px-6 py-4 whitespace-normal max-w-xs">
-                    <div class="text-slate-100 font-medium truncate" title="${item.subject}">${item.subject}</div>
-                </td>
-                <td class="px-6 py-4 text-xs">
-                    <div class="text-slate-200">${item.fromUser}</div>
-                    <div class="text-slate-500">${item.fromOrg}</div>
-                </td>
-                <td class="px-6 py-4 text-xs max-w-[150px] overflow-hidden text-ellipsis text-slate-400" title="${item.toUser}">
-                    ${item.toUser}
-                </td>
-                <td class="px-6 py-4">
-                    <span class="px-2 py-1 rounded-full text-[10px] uppercase font-bold ${item.status === 'Approved' ? 'bg-green-500/10 text-green-400' : 'bg-slate-700 text-slate-300'}">
-                        ${item.status || 'N/A'}
-                    </span>
-                </td>
-                <td class="px-6 py-4 text-xs">
-                    ${docInfo}
-                    ${fileInfo}
-                </td>
-            </tr>
+    grid.innerHTML = filtered.map(item => {
+        const dateStr = item.date ? new Date(item.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : 'N/A';
+        return `
+            <div class="trans-card ${item.isUnread ? 'unread' : ''} p-6 rounded-2xl animate-fade-in">
+                <div class="flex justify-between items-start mb-4">
+                    <span class="text-[10px] font-bold text-brand tracking-widest uppercase">${item.mailNo || 'CORREO'}</span>
+                    <span class="text-[10px] text-slate-500 font-medium">${dateStr}</span>
+                </div>
+                <h3 class="text-sm font-bold text-slate-100 leading-tight mb-2 line-clamp-2" title="${item.subject}">${item.subject || '(Sin Asunto)'}</h3>
+                <div class="flex items-center gap-3 mt-4 pt-4 border-t border-slate-700/30">
+                    <div class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-brand font-bold text-xs ring-1 ring-slate-700">
+                        ${(item.fromUser || 'U').charAt(0)}
+                    </div>
+                    <div class="flex flex-col min-w-0">
+                        <span class="text-xs font-semibold text-slate-200 truncate">${item.fromUser}</span>
+                        <span class="text-[10px] text-slate-500 truncate">${item.fromOrg}</span>
+                    </div>
+                </div>
+                ${item.docName ? `
+                <div class="mt-4 flex items-center gap-2 px-3 py-2 bg-slate-900/40 rounded-lg border border-slate-700/30">
+                    <svg class="w-3 h-3 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                    <span class="text-[10px] text-slate-400 truncate">${item.docName}</span>
+                </div>` : ''}
+            </div>
         `;
-    });
-    notifTableBody.innerHTML = html;
+    }).join('');
 }
 
 function updateTransFilterOptions() {
-    const fields = [
-        { id: 'filterTransUser', key: 'fromUser', label: 'Remitente' },
-        { id: 'filterTransOrg', key: 'fromOrg', label: 'Organización' },
-        { id: 'filterTransStatus', key: 'status', label: 'Estatus' }
-    ];
-
-    fields.forEach(f => {
-        const el = document.getElementById(f.id);
-        const currentVal = el.value;
-        const uniqueValues = [...new Set(localTransmittalsDB.map(i => i[f.key]))].filter(Boolean).sort();
-        
-        el.innerHTML = `<option value="">${f.label} (Todos)</option>` + 
-                       uniqueValues.map(v => `<option value="${v}" ${v === currentVal ? 'selected' : ''}>${v}</option>`).join('');
-    });
-
-    // Filtro especial para Destinatarios (ya que pueden ser múltiples en un solo registro)
-    const recipientEl = document.getElementById('filterTransRecipient');
-    const currentR = recipientEl.value;
-    let allRecipients = [];
-    localTransmittalsDB.forEach(item => {
-        if (item.toUser) {
-            allRecipients = allRecipients.concat(item.toUser.split(', ').map(s => s.trim()));
-        }
-    });
-    const uniqueRecipients = [...new Set(allRecipients)].filter(Boolean).sort();
-    recipientEl.innerHTML = `<option value="">Destinatario (Todos)</option>` + 
-                            uniqueRecipients.map(v => `<option value="${v}" ${v === currentR ? 'selected' : ''}>${v}</option>`).join('');
+    const orgSelect = document.getElementById('filterTransOrg');
+    if (!orgSelect) return;
+    
+    const currentVal = orgSelect.value;
+    const orgs = [...new Set(localTransmittalsDB.map(i => i.fromOrg).filter(Boolean))].sort();
+    
+    orgSelect.innerHTML = `<option value="">Todas las Organizaciones</option>` + 
+                          orgs.map(o => `<option value="${o}" ${o === currentVal ? 'selected' : ''}>${o}</option>`).join('');
 }
 
-btnRefreshNotif.addEventListener('click', syncNotifications);
-filterTransSearch.addEventListener('input', () => { transCurrentPage = 1; renderNotifications(); });
-filterTransUser.addEventListener('change', () => { transCurrentPage = 1; renderNotifications(); });
-filterTransOrg.addEventListener('change', () => { transCurrentPage = 1; renderNotifications(); });
-filterTransRecipient.addEventListener('change', () => { transCurrentPage = 1; renderNotifications(); });
-filterTransStatus.addEventListener('change', () => { transCurrentPage = 1; renderNotifications(); });
+// Event Listeners (Senior UX)
+btnRefreshNotif.addEventListener('click', () => syncNotifications(false));
+document.getElementById('btnLoadMoreTrans')?.addEventListener('click', () => syncNotifications(true));
+
+filterTransSearch.addEventListener('input', () => {
+    clearTimeout(transSearchTimeout);
+    transSearchTimeout = setTimeout(renderNotifications, 300);
+});
+
+filterTransOrg.addEventListener('change', renderNotifications);
+document.getElementById('filterTransUnread')?.addEventListener('change', () => syncNotifications(false));
+
 
 // Pagination Listeners
 document.getElementById('docPrev').addEventListener('click', () => { if (docCurrentPage > 1) { docCurrentPage--; renderTable(); } });

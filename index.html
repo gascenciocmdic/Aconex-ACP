@@ -282,97 +282,90 @@
         <div id="view-notificaciones" class="view-section hidden animate-fade-in">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                    <h2 class="text-2xl font-bold text-white">Listado de Transmittals</h2>
-                    <p class="text-slate-400 text-sm mt-1">Todos los registros de correspondencia de tipo Transmittal en el proyecto.</p>
+                    <h2 class="text-2xl font-bold text-white">Transmittals Pendientes</h2>
+                    <p class="text-slate-400 text-sm mt-1">Solo registros oficiales <span class="text-brand font-bold">-TRN</span> detectados en tu Inbox.</p>
                 </div>
-                <button id="btnRefreshNotif" class="bg-brand hover:bg-brand-hover text-white px-6 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 shadow-lg shadow-brand/20 transition-all">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                    Extraer Transmittals
+                <div class="flex gap-3">
+                    <div class="flex flex-col items-end">
+                        <span id="transTotalCounter" class="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1">Total en Aconex</span>
+                        <span id="transCount" class="text-xl font-bold text-brand">0</span>
+                    </div>
+                    <button id="btnRefreshNotif" class="bg-brand hover:bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 shadow-lg shadow-brand/20 transition-all active:scale-95">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        Sincronizar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Enhanced Filters -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div class="md:col-span-2 relative">
+                    <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    <input type="text" id="filterTransSearch" placeholder="Filtrar por asunto, emisor o código..." class="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-brand outline-none transition-all placeholder:text-slate-500">
+                </div>
+                <select id="filterTransOrg" class="bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 text-sm text-slate-300 outline-none focus:ring-2 focus:ring-brand appearance-none">
+                    <option value="">Todas las Organizaciones</option>
+                </select>
+                <div class="flex items-center gap-2 px-4 py-3 bg-slate-800/30 rounded-xl border border-slate-700/30">
+                    <input type="checkbox" id="filterTransUnread" checked class="w-4 h-4 rounded border-slate-700 text-brand focus:ring-brand bg-slate-900">
+                    <label for="filterTransUnread" class="text-xs text-slate-400 cursor-pointer select-none">Solo No Leídos</label>
+                </div>
+            </div>
+
+            <!-- Card Grid Container -->
+            <div id="notifCardGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 min-h-[400px]">
+                <!-- Cards will be injected here -->
+            </div>
+
+            <!-- Skeleton Container (Initially Hidden) -->
+            <div id="notifSkeletonContainer" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+                <!-- Generic Skeleton Card -->
+                <div class="skeleton-card bg-slate-800/20 border border-slate-700/30 rounded-2xl p-6 h-48 animate-pulse">
+                    <div class="h-4 bg-slate-700/50 rounded w-1/4 mb-4"></div>
+                    <div class="h-6 bg-slate-700/50 rounded w-3/4 mb-2"></div>
+                    <div class="h-4 bg-slate-700/50 rounded w-full mb-8"></div>
+                    <div class="flex justify-between items-center">
+                        <div class="h-8 w-24 bg-slate-700/50 rounded-full"></div>
+                        <div class="h-4 w-16 bg-slate-700/50 rounded"></div>
+                    </div>
+                </div>
+                <!-- Duplicate for better visual effect -->
+                <div class="skeleton-card hidden md:block bg-slate-800/20 border border-slate-700/30 rounded-2xl p-6 h-48 animate-pulse">
+                    <div class="h-4 bg-slate-700/50 rounded w-1/4 mb-4"></div>
+                    <div class="h-6 bg-slate-700/50 rounded w-3/4 mb-2"></div>
+                    <div class="h-4 bg-slate-700/50 rounded w-full mb-8"></div>
+                    <div class="flex justify-between items-center">
+                        <div class="h-8 w-24 bg-slate-700/50 rounded-full"></div>
+                        <div class="h-4 w-16 bg-slate-700/50 rounded"></div>
+                    </div>
+                </div>
+                <div class="skeleton-card hidden lg:block bg-slate-800/20 border border-slate-700/30 rounded-2xl p-6 h-48 animate-pulse">
+                    <div class="h-4 bg-slate-700/50 rounded w-1/4 mb-4"></div>
+                    <div class="h-6 bg-slate-700/50 rounded w-3/4 mb-2"></div>
+                    <div class="h-4 bg-slate-700/50 rounded w-full mb-8"></div>
+                    <div class="flex justify-between items-center">
+                        <div class="h-8 w-24 bg-slate-700/50 rounded-full"></div>
+                        <div class="h-4 w-16 bg-slate-700/50 rounded"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Empty State Message -->
+            <div id="notifEmptyState" class="hidden flex flex-col items-center justify-center py-24 text-center">
+                <div class="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-4 text-slate-600">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+                </div>
+                <h3 class="text-lg font-semibold text-slate-300">No hay Transmittals pendientes</h3>
+                <p class="text-slate-500 text-sm max-w-xs">Todos los documentos bajo el criterio -TRN están procesados o leídos.</p>
+            </div>
+
+            <!-- Load More Interaction -->
+            <div id="notifLoadMoreContainer" class="hidden mt-12 flex flex-col items-center gap-4">
+                <button id="btnLoadMoreTrans" class="group flex items-center gap-2 px-8 py-3 bg-slate-800/50 hover:bg-slate-700 transition-all rounded-full border border-slate-600/50 text-slate-300 font-medium">
+                    <span>Cargar más Transmittals</span>
+                    <svg class="w-4 h-4 group-hover:translate-y-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
                 </button>
-            </div>
-
-            <!-- FILTERS FOR TRANSMITTALS -->
-            <div class="glass-card mb-6 p-4 rounded-xl border border-slate-700/50 flex flex-wrap gap-4 items-center">
-                <div class="flex-1 min-w-[200px]">
-                    <div class="relative">
-                        <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                        <input type="text" id="filterTransSearch" placeholder="Buscar por asunto o remitente..." class="w-full bg-slate-900/50 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition-all">
-                    </div>
-                </div>
-                <select id="filterTransUser" class="bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 outline-none focus:ring-1 focus:ring-brand">
-                    <option value="">Remitente (Todos)</option>
-                </select>
-                <select id="filterTransOrg" class="bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 outline-none focus:ring-1 focus:ring-brand">
-                    <option value="">Organización (Todos)</option>
-                </select>
-                <select id="filterTransRecipient" class="bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 outline-none focus:ring-1 focus:ring-brand">
-                    <option value="">Destinatario (Todos)</option>
-                </select>
-                <select id="filterTransStatus" class="bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 outline-none focus:ring-1 focus:ring-brand">
-                    <option value="">Estatus (Todos)</option>
-                </select>
-                <div class="flex items-center gap-2 px-3 py-2 bg-slate-800/50 rounded-lg border border-slate-700">
-                    <input type="checkbox" id="filterTransUnread" class="w-4 h-4 rounded border-slate-700 text-brand focus:ring-brand bg-slate-900">
-                    <label for="filterTransUnread" class="text-xs text-slate-400 cursor-pointer select-none">Solo no leídos</label>
-                </div>
-                <div class="flex items-center gap-2 px-3 py-2 bg-slate-800/50 rounded-lg border border-slate-700 text-xs text-slate-400">
-                    <span id="transCount" class="font-bold text-brand">0</span> registros
-                </div>
-            </div>
-
-            <div class="glass-card rounded-xl overflow-hidden border border-slate-700/50">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm whitespace-nowrap">
-                        <thead class="bg-slate-800/50 text-slate-300 uppercase text-xs font-semibold tracking-wider">
-                            <tr>
-                                <th class="px-6 py-4 cursor-pointer hover:text-brand transition-colors group" data-sort-trans="date">
-                                    Fecha <span class="sort-icon opacity-30">↕</span>
-                                </th>
-                                <th class="px-6 py-4 cursor-pointer hover:text-brand transition-colors group" data-sort-trans="mailNo">
-                                    ID / Correo <span class="sort-icon opacity-30">↕</span>
-                                </th>
-                                <th class="px-6 py-4 cursor-pointer hover:text-brand transition-colors group" data-sort-trans="subject">
-                                    Asunto <span class="sort-icon opacity-30">↕</span>
-                                </th>
-                                <th class="px-6 py-4">Remitente</th>
-                                <th class="px-6 py-4">Destinatario</th>
-                                <th class="px-6 py-4">Estatus</th>
-                                <th class="px-6 py-4">Documento / Rev / Archivo</th>
-                            </tr>
-                        </thead>
-                        <tbody id="notifTableBody" class="divide-y divide-slate-700/50 text-slate-300">
-                            <tr>
-                                <td colspan="4" class="px-6 py-12 text-center text-slate-500 italic">
-                                    Presiona "Extraer Transmittals" para obtener el listado completo...
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Transmittal Pagination -->
-            <div class="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-900/30 p-4 rounded-xl border border-slate-700/50">
-                <div class="flex items-center gap-3">
-                    <label class="text-xs text-slate-400">Mostrar:</label>
-                    <select id="transPagingSize" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-300 outline-none focus:ring-1 focus:ring-brand">
-                        <option value="50">50</option>
-                        <option value="100">100</option>
-                        <option value="200">200</option>
-                        <option value="500">500</option>
-                    </select>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button id="transPrev" class="p-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-brand disabled:opacity-30 disabled:cursor-not-allowed">
-                        <i class="fas fa-chevron-left text-xs"></i>
-                    </button>
-                    <div id="transPagingInfo" class="text-xs text-slate-300 font-medium bg-slate-800 px-4 py-2 rounded-lg border border-slate-700">
-                        Página <span id="transCurrentPage">1</span> de <span id="transTotalPages">1</span>
-                    </div>
-                    <button id="transNext" class="p-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-brand disabled:opacity-30 disabled:cursor-not-allowed">
-                        <i class="fas fa-chevron-right text-xs"></i>
-                    </button>
-                </div>
+                <span id="transPageCounter" class="text-[10px] text-slate-600 uppercase font-bold tracking-tighter">Página 1</span>
             </div>
         </div>
 

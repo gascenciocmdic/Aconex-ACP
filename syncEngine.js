@@ -382,6 +382,67 @@ class SyncEngine {
         }
     }
 
+    /**
+     * Nuevo método Senior UX: Carga por lotes (50) para Infinite Scroll.
+     */
+    async fetchTransmittalBatch({ page = 1, pageSize = 50, status = 'Unread' }) {
+        try {
+            const params = {
+                mail_box: 'Inbox',
+                search_type: 'PAGED',
+                page_size: pageSize,
+                page_number: page,
+                status: status
+            };
+
+            const xmlList = await this.client.fetchMail(params);
+            const metadata = this.parseMailSearchMetadata(xmlList);
+            
+            // 1. Extraer IDs de la página actual
+            const mailIds = [];
+            const xmlDoc = this.parser.parseFromString(xmlList, "text/xml");
+            const elements = Array.from(xmlDoc.getElementsByTagName('*'));
+            elements.forEach(item => {
+                const baseName = item.nodeName.split(':').pop();
+                if (['MailItem', 'Mail', 'MailHeader'].includes(baseName)) {
+                    const id = item.getAttribute('MailId') || item.querySelector('MailId')?.textContent.trim();
+                    if (id) mailIds.push(id);
+                }
+            });
+
+            // 2. Extraer detalles en paralelo para este lote (máximo 10 concurrentes)
+            const batchDetails = [];
+            const CONCURRENCY = 10;
+            
+            for (let i = 0; i < mailIds.length; i += CONCURRENCY) {
+                const batch = mailIds.slice(i, i + CONCURRENCY);
+                await Promise.all(batch.map(async (mailId) => {
+                    try {
+                        const xmlDetail = await this.client.fetchMailDetail(mailId);
+                        const detail = this.parseTransmittalDetails(xmlDetail);
+                        if (detail) {
+                            // Filtro Senior UX: Solo incluir si el MailNo contiene "-TRN"
+                            if (detail.mailNo?.toString().includes('-TRN')) {
+                                batchDetails.push(detail);
+                            }
+                        }
+                    } catch (e) {
+                        console.warn(`Error en lote mail ${mailId}:`, e.message);
+                    }
+                }));
+            }
+
+            return {
+                data: batchDetails.sort((a,b) => new Date(b.date) - new Date(a.date)),
+                totalResults: metadata.totalResults,
+                hasNextPage: (page * pageSize) < metadata.totalResults
+            };
+        } catch (e) {
+            console.error("Error en fetchTransmittalBatch (Senior UX):", e);
+            throw e;
+        }
+    }
+
     async syncAllData({ onStart, onProgress, onDocumentUpsert, onCircuitBreakerTrip, onFinish, onError, onRawResponse, pageSize = 200 }) {
         try {
             if (onStart) onStart();
