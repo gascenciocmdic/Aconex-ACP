@@ -127,7 +127,13 @@ tabs.forEach(tab => {
             if (v.id === `view-${target}`) {
                 v.classList.remove('hidden');
                 v.classList.add('active');
-                if (target === 'notificaciones') syncNotifications();
+                
+                // Senior UX: Auto-sync solo si no hay datos cargados previamente
+                if (target === 'notificaciones' && localTransmittalsDB.length === 0) {
+                    syncNotifications();
+                } else if (target === 'notificaciones') {
+                    renderNotifications(); // Mostrar caché
+                }
             } else {
                 v.classList.add('hidden');
                 v.classList.remove('active');
@@ -638,8 +644,12 @@ function renderNotifications() {
 
     grid.innerHTML = filtered.map(item => {
         const dateStr = item.date ? new Date(item.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : 'N/A';
+        // Stringify item for the modal (handling quotes)
+        const itemJson = JSON.stringify(item).replace(/'/g, "&apos;").replace(/"/g, "&quot;");
+        
         return `
-            <div class="trans-card ${item.isUnread ? 'unread' : ''} p-6 rounded-2xl animate-fade-in">
+            <div class="trans-card ${item.isUnread ? 'unread' : ''} p-6 rounded-2xl animate-fade-in" 
+                 onclick='openTransModal(${itemJson})'>
                 <div class="flex justify-between items-start mb-4">
                     <span class="text-[10px] font-bold text-brand tracking-widest uppercase">${item.mailNo || 'CORREO'}</span>
                     <span class="text-[10px] text-slate-500 font-medium">${dateStr}</span>
@@ -663,6 +673,27 @@ function renderNotifications() {
         `;
     }).join('');
 }
+
+// Modal Logic (Senior UX)
+window.openTransModal = function(item) {
+    const modal = document.getElementById('modalTransDetail');
+    document.getElementById('modalTransId').textContent = item.mailNo || item.id;
+    document.getElementById('modalTransSubject').textContent = item.subject || '(Sin Asunto)';
+    document.getElementById('modalTransFrom').textContent = item.fromUser;
+    document.getElementById('modalTransFromOrg').textContent = item.fromOrg;
+    document.getElementById('modalTransDate').textContent = item.date ? new Date(item.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' }) : 'N/A';
+    document.getElementById('modalTransTo').textContent = item.toUser || 'No especificados';
+    document.getElementById('modalTransContent').textContent = item.content || '(El mensaje no tiene contenido de texto)';
+    
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden'; // Lock scroll
+};
+
+window.closeTransModal = function() {
+    const modal = document.getElementById('modalTransDetail');
+    modal.classList.add('hidden');
+    document.body.style.overflow = ''; // Unlock scroll
+};
 
 function updateTransFilterOptions() {
     const orgSelect = document.getElementById('filterTransOrg');
@@ -688,7 +719,7 @@ filterTransOrg.addEventListener('change', renderNotifications);
 document.getElementById('filterTransUnread')?.addEventListener('change', () => syncNotifications(false));
 
 
-// Pagination Listeners
+// Pagination Listeners (obsolete for Transmittals, kept for Docs)
 document.getElementById('docPrev').addEventListener('click', () => { if (docCurrentPage > 1) { docCurrentPage--; renderTable(); } });
 document.getElementById('docNext').addEventListener('click', () => { 
     const totalPages = Math.ceil(applyFilters(localDB).length / docPageSize);
@@ -698,17 +729,6 @@ document.getElementById('docPagingSize').addEventListener('change', (e) => {
     docPageSize = parseInt(e.target.value);
     docCurrentPage = 1;
     renderTable();
-});
-
-document.getElementById('transPrev').addEventListener('click', () => { if (transCurrentPage > 1) { transCurrentPage--; renderNotifications(); } });
-document.getElementById('transNext').addEventListener('click', () => { 
-    const totalPages = Math.ceil(applyTransFilters(localTransmittalsDB).length / transPageSize);
-    if (transCurrentPage < totalPages) { transCurrentPage++; renderNotifications(); } 
-});
-document.getElementById('transPagingSize').addEventListener('change', (e) => {
-    transPageSize = parseInt(e.target.value);
-    transCurrentPage = 1;
-    renderNotifications();
 });
 
 // ======================================

@@ -285,10 +285,14 @@
                     <h2 class="text-2xl font-bold text-white">Transmittals Pendientes</h2>
                     <p class="text-slate-400 text-sm mt-1">Solo registros oficiales <span class="text-brand font-bold">-TRN</span> detectados en tu Inbox.</p>
                 </div>
-                <div class="flex gap-3">
+                <div class="flex gap-4">
                     <div class="flex flex-col items-end">
-                        <span id="transTotalCounter" class="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1">Total en Aconex</span>
-                        <span id="transCount" class="text-xl font-bold text-brand">0</span>
+                        <span class="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1">Cargados</span>
+                        <span id="transCount" class="text-xl font-bold text-slate-100">0</span>
+                    </div>
+                    <div class="flex flex-col items-end border-l border-slate-700 pl-4">
+                        <span class="text-[10px] text-blue-400 uppercase font-bold tracking-widest mb-1">Total Proyecto</span>
+                        <span id="transTotalCounter" class="text-xl font-bold text-brand">0</span>
                     </div>
                     <button id="btnRefreshNotif" class="bg-brand hover:bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 shadow-lg shadow-brand/20 transition-all active:scale-95">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
@@ -460,6 +464,57 @@
         </div>
 
     </main>
+
+    <!-- MODAL: DETALLE TRANSMITTAL -->
+    <div id="modalTransDetail" class="fixed inset-0 z-[100] hidden">
+        <div class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onclick="closeTransModal()"></div>
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl bg-slate-900 border border-slate-700/50 rounded-3xl shadow-2xl overflow-hidden animate-fade-in">
+            <!-- Modal Header -->
+            <div class="px-8 py-6 border-b border-slate-700/50 flex justify-between items-center bg-slate-800/40">
+                <div class="flex flex-col">
+                    <span id="modalTransId" class="text-[10px] font-bold text-brand tracking-widest uppercase">TRN-001</span>
+                    <h3 id="modalTransSubject" class="text-lg font-bold text-white leading-tight mt-1">Asunto del Transmittal</h3>
+                </div>
+                <button onclick="closeTransModal()" class="p-2 hover:bg-slate-700 rounded-full text-slate-400 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l18 18"></path></svg>
+                </button>
+            </div>
+            
+            <!-- Modal Body -->
+            <div class="px-8 py-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                <div class="grid grid-cols-2 gap-8 mb-8">
+                    <div>
+                        <span class="block text-[10px] text-slate-500 uppercase font-bold mb-1">De:</span>
+                        <div id="modalTransFrom" class="text-sm text-slate-200 font-medium">Nombre Usuario</div>
+                        <div id="modalTransFromOrg" class="text-[11px] text-slate-500">Organización</div>
+                    </div>
+                    <div>
+                        <span class="block text-[10px] text-slate-500 uppercase font-bold mb-1">Fecha:</span>
+                        <div id="modalTransDate" class="text-sm text-slate-200">28 Mar 2026</div>
+                    </div>
+                </div>
+
+                <div class="mb-8">
+                    <span class="block text-[10px] text-slate-500 uppercase font-bold mb-2">Para:</span>
+                    <p id="modalTransTo" class="text-xs text-slate-400 leading-relaxed bg-slate-800/30 p-4 rounded-xl border border-slate-700/30">
+                        Destinatarios...
+                    </p>
+                </div>
+
+                <div>
+                    <span class="block text-[10px] text-slate-500 uppercase font-bold mb-2">Contenido:</span>
+                    <div id="modalTransContent" class="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap font-sans bg-slate-800/30 p-6 rounded-2xl border border-slate-700/30">
+                        Contenido del mensaje...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-8 py-6 border-t border-slate-700/50 bg-slate-800/40 flex justify-end">
+                <button onclick="closeTransModal()" class="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-sm font-medium transition-colors">Cerrar</button>
+            </div>
+        </div>
+    </div>
 
     <script type="module" src="app.js"></script>
 </body>
