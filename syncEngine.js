@@ -371,10 +371,11 @@ class SyncEngine {
         try {
             if (onStart) onStart();
 
-            // Paginación configurada por el usuario (mínimo 50, máximo 500)
+            // Paginación configurada por el usuario (mínimo 50, máximo 1000)
+            const actualPageSize = Math.min(Math.max(pageSize, 50), 1000);
             const params = {
                 search_type: 'PAGED',
-                page_size: Math.min(Math.max(pageSize, 50), 500),
+                page_size: actualPageSize,
                 page_number: 1
             };
 
@@ -387,27 +388,38 @@ class SyncEngine {
             const rawDocs1 = this.parseDocumentsFromXml(initialXml);
             const curatedDocs1 = AconexETLProcessor.processDocuments(rawDocs1);
             
-            if (onProgress) onProgress(1, totalPages);
             for (const doc of curatedDocs1) {
                 if (onDocumentUpsert) await onDocumentUpsert(doc);
             }
+            if (onProgress) onProgress(1, totalPages);
 
-            // Ciclo de páginas restantes
-            for (let page = 2; page <= totalPages; page++) {
-                if (this.client.isBlocked) break;
+            // Ciclo de páginas restantes en paralelo (máximo 5 concurrentes)
+            if (totalPages > 1) {
+                const CONCURRENCY_LIMIT = 5;
+                const pages = [];
+                for (let p = 2; p <= totalPages; p++) pages.push(p);
 
-                const loopParams = { ...params, page_number: page };
-                const xmlResp = await this.client.fetchProjects(loopParams, onCircuitBreakerTrip);
-                
-                const rawDocs = this.parseDocumentsFromXml(xmlResp);
-                const curated = AconexETLProcessor.processDocuments(rawDocs);
-                
-                if (onProgress) onProgress(page, totalPages);
-                for (const doc of curated) {
-                    if (onDocumentUpsert) await onDocumentUpsert(doc);
+                for (let i = 0; i < pages.length; i += CONCURRENCY_LIMIT) {
+                    if (this.client.isBlocked) break;
+
+                    const batch = pages.slice(i, i + CONCURRENCY_LIMIT);
+                    await Promise.all(batch.map(async (page) => {
+                        const loopParams = { ...params, page_number: page };
+                        const xmlResp = await this.client.fetchProjects(loopParams, onCircuitBreakerTrip);
+                        
+                        const rawDocs = this.parseDocumentsFromXml(xmlResp);
+                        const curated = AconexETLProcessor.processDocuments(rawDocs);
+                        
+                        for (const doc of curated) {
+                            if (onDocumentUpsert) await onDocumentUpsert(doc);
+                        }
+                        
+                        if (onProgress) onProgress(page, totalPages);
+                    }));
+                    
+                    // Pequeño reposo entre batches para evitar Rate Limits
+                    await new Promise(r => setTimeout(r, 200));
                 }
-                
-                await new Promise(r => setTimeout(r, 300));
             }
 
             if (onFinish) onFinish();

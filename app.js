@@ -828,6 +828,10 @@ btnStartSync.addEventListener('click', async () => {
                 progressText.textContent = `Página ${current} de ${total}`;
                 progressPercent.textContent = `${percent}%`;
                 progressBar.style.width = `${percent}%`;
+                
+                // Renderizado incremental por página
+                renderTable();
+                updateFilterOptions();
             },
             onDocumentUpsert: async (doc) => {
                 const idx = localDB.findIndex(d => d.docno === doc.docno);
