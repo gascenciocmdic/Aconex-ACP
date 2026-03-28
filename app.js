@@ -594,11 +594,22 @@ async function syncNotifications() {
     
     const engine = new SyncEngine(null, globalConfig);
     try {
+        localTransmittalsDB = []; // Resetear para carga incremental limpia
+        
         const syncOptions = {
             onProgress: (done, total, msg) => {
                 const displayMsg = msg || `Descargando detalles... ${done} de ${total}`;
-                notifTableBody.innerHTML = `<tr><td colspan="7" class="px-6 py-12 text-center text-slate-500 italic"><span class="animate-pulse">${displayMsg}</span></td></tr>`;
                 if (techLog) techLog.value += `\r[SYNC] ${displayMsg}`;
+                // No pisamos el renderizado incremental con el spinner si ya hay datos
+                if (localTransmittalsDB.length === 0) {
+                    notifTableBody.innerHTML = `<tr><td colspan="7" class="px-6 py-12 text-center text-slate-500 italic"><span class="animate-pulse">${displayMsg}</span></td></tr>`;
+                }
+            },
+            onTransmittalUpsert: async (item) => {
+                localTransmittalsDB.push(item);
+                // Renderizado incremental (throttled por la naturaleza de las promesas paralelas)
+                renderNotifications();
+                updateTransFilterOptions();
             }
         };
         
@@ -606,11 +617,8 @@ async function syncNotifications() {
             syncOptions.status = 'Unread';
         }
 
-        localTransmittalsDB = await engine.syncAllTransmittals(syncOptions);
+        await engine.syncAllTransmittals(syncOptions);
 
-        updateTransFilterOptions();
-        renderNotifications();
-        
         // Ocultar badge al ver las notificaciones (limpiar estado)
         notifBadge.classList.add('hidden'); 
     } catch (e) {

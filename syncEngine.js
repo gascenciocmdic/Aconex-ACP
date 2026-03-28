@@ -286,104 +286,98 @@ class SyncEngine {
     }
 
     async syncAllTransmittals(options = {}) {
-        const { onProgress, status } = options;
+        const { onProgress, onTransmittalUpsert, status } = options;
         try {
             const allMailIds = [];
-            let startRow = 1;
             let totalResults = 0;
-            const pageSize = 250; // Solicitado: page_size=250
+            const pageSize = 250; 
 
-            if (onProgress) onProgress(0, 0, "Buscando IDs de transmittals...");
+            if (onProgress) onProgress(0, 0, "Buscando IDs de transmittals (Página 1)...");
 
-            // PASO 1: Obtener todos los MailId disponibles
-            do {
-                const params = { 
-                    mail_box: 'Inbox', 
-                    page_size: pageSize
-                };
-                if (startRow > 1) params.start = startRow;
-                if (status) params.status = status;
+            // PASO 1: Obtener todos los MailId disponibles en Paralelo (si hay varias páginas)
+            const initialParams = { 
+                mail_box: 'Inbox', 
+                search_type: 'PAGED',
+                page_size: pageSize,
+                page_number: 1
+            };
+            if (status) initialParams.status = status;
 
-                const xmlList = await this.client.fetchMail(params);
-                const metadata = this.parseMailSearchMetadata(xmlList);
-                
-                // Solo actualizar totalResults si el metadato es válido (>0)
-                if (metadata.totalResults > 0 && totalResults === 0) {
-                    totalResults = metadata.totalResults;
-                }
+            const firstXml = await this.client.fetchMail(initialParams);
+            const firstMetadata = this.parseMailSearchMetadata(firstXml);
+            totalResults = firstMetadata.totalResults;
+            const totalPages = Math.ceil(totalResults / pageSize);
 
-                // Extraer IDs del XML de búsqueda de forma robusta (ignora namespaces)
-                const xmlDoc = this.parser.parseFromString(xmlList, "text/xml");
-                const allElements = Array.from(xmlDoc.getElementsByTagName('*'));
-                let itemsFoundInPage = 0;
-                allElements.forEach(item => {
+            const extractIds = (xml) => {
+                const xmlDoc = this.parser.parseFromString(xml, "text/xml");
+                const elements = Array.from(xmlDoc.getElementsByTagName('*'));
+                elements.forEach(item => {
                     const baseName = item.nodeName.split(':').pop();
                     if (['MailItem', 'Mail', 'MailHeader'].includes(baseName)) {
                         const id = item.getAttribute('MailId') || item.querySelector('MailId')?.textContent.trim();
-                        if (id && !allMailIds.includes(id)) {
-                            allMailIds.push(id);
-                            itemsFoundInPage++;
-                        }
+                        if (id && !allMailIds.includes(id)) allMailIds.push(id);
                     }
                 });
+            };
 
-                if (onProgress) onProgress(0, 0, `Obtenidos ${allMailIds.length} de ${totalResults || '?'} IDs...`);
-                
-                // Si no hay más resultados o llegamos al total conocido, salir
-                if (itemsFoundInPage === 0 || (totalResults > 0 && allMailIds.length >= totalResults)) break;
-                
-                startRow += pageSize; // Usamos pageSize fijo (250) para el avance de 'start'
-                
-                if (startRow <= totalResults || totalResults === 0) {
-                    await new Promise(r => setTimeout(r, 200));
+            extractIds(firstXml);
+
+            if (totalPages > 1) {
+                const pageTasks = [];
+                for (let p = 2; p <= totalPages; p++) {
+                    pageTasks.push(p);
                 }
 
-            } while (startRow <= totalResults || (totalResults === 0 && allMailIds.length > 0));
+                const PAGE_CONCURRENCY = 5;
+                for (let i = 0; i < pageTasks.length; i += PAGE_CONCURRENCY) {
+                    const batch = pageTasks.slice(i, i + PAGE_CONCURRENCY);
+                    await Promise.all(batch.map(async (p) => {
+                        const pXml = await this.client.fetchMail({ ...initialParams, page_number: p });
+                        extractIds(pXml);
+                        if (onProgress) onProgress(0, 0, `Obtenidos ${allMailIds.length} de ${totalResults} IDs...`);
+                    }));
+                }
+            }
 
             if (allMailIds.length === 0) return [];
 
-            // PASO 2: Extracción en Paralelo con Control de Flujo (Promise Pool)
+            // PASO 2: Extracción en Paralelo de Detalles con Control de Flujo
             const fullDetails = [];
-            const CONCURRENCY_LIMIT = 10;
+            const DETAIL_CONCURRENCY = 10;
             const total = allMailIds.length;
             let completedCount = 0;
 
-            const processBatch = async (ids) => {
-                return Promise.all(ids.map(async (mailId) => {
-                    try {
-                        const xmlDetail = await this.client.fetchMailDetail(mailId);
-                        const detail = this.parseTransmittalDetails(xmlDetail);
-                        
-                        // FILTRO "TRN": Solo incluir si el MailNo contiene "TRN"
-                        if (detail) {
-                            if (detail.mailNo?.toString().includes('TRN')) {
-                                fullDetails.push(detail);
-                            } else {
-                                console.log(`Skipping non-TRN mail: ${detail.mailNo}`);
-                            }
+            const processMail = async (mailId) => {
+                try {
+                    const xmlDetail = await this.client.fetchMailDetail(mailId);
+                    const detail = this.parseTransmittalDetails(xmlDetail);
+                    
+                    if (detail) {
+                        // FILTRO "TRN": Conservamos la lógica solicitada previamente
+                        if (detail.mailNo?.toString().includes('TRN')) {
+                            fullDetails.push(detail);
+                            if (onTransmittalUpsert) await onTransmittalUpsert(detail);
                         }
-                    } catch (e) {
-                        console.warn(`Error al obtener detalle mail ${mailId}:`, e.message);
-                    } finally {
-                        completedCount++;
-                        if (onProgress) onProgress(completedCount, total, `Procesando: ${completedCount}/${total} (${Math.round(completedCount/total*100)}%)`);
                     }
-                }));
+                } catch (e) {
+                    console.warn(`Error al obtener detalle mail ${mailId}:`, e.message);
+                } finally {
+                    completedCount++;
+                    if (onProgress) onProgress(completedCount, total, `Procesando: ${completedCount}/${total} (${Math.round(completedCount/total*100)}%)`);
+                }
             };
 
-            // Ejecutar en grupos de 10
-            for (let i = 0; i < allMailIds.length; i += this.CONCURRENCY_LIMIT) {
-                const batch = allMailIds.slice(i, i + this.CONCURRENCY_LIMIT);
-                await processBatch(batch);
-                // Pequeño reposo para el Rate Limit entre batches si es necesario
-                await new Promise(r => setTimeout(r, 100));
+            for (let i = 0; i < allMailIds.length; i += DETAIL_CONCURRENCY) {
+                const batch = allMailIds.slice(i, i + DETAIL_CONCURRENCY);
+                await Promise.all(batch.map(id => processMail(id)));
+                // Mínimo delay para no saturar la API
+                await new Promise(r => setTimeout(r, 50));
             }
 
-            // Ordenar por fecha descendente (más recientes primero)
             return fullDetails.sort((a,b) => new Date(b.date) - new Date(a.date));
 
         } catch (e) {
-            console.error("Error en sincronización optimizada:", e);
+            console.error("Error en sincronización optimizada de transmittals:", e);
             throw e;
         }
     }
