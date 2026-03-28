@@ -385,15 +385,17 @@ class SyncEngine {
     /**
      * Nuevo método Senior UX: Carga por lotes (50) para Infinite Scroll.
      */
-    async fetchTransmittalBatch({ page = 1, pageSize = 50, status = 'Unread' }) {
+    async fetchTransmittalBatch({ page = 1, pageSize = 50, status = null }) {
         try {
             const params = {
                 mail_box: 'Inbox',
                 search_type: 'PAGED',
                 page_size: pageSize,
-                page_number: page,
-                status: status
+                page_number: page
             };
+
+            // Sugerencia del usuario: Usar read=false para filtrar en el servidor
+            if (status === 'Unread') params.read = false;
 
             const xmlList = await this.client.fetchMail(params);
             const metadata = this.parseMailSearchMetadata(xmlList);
@@ -422,7 +424,12 @@ class SyncEngine {
                         const detail = this.parseTransmittalDetails(xmlDetail);
                         if (detail) {
                             // Filtro Senior UX: Solo incluir si el MailNo contiene "-TRN"
-                            if (detail.mailNo?.toString().includes('-TRN')) {
+                            const matchTRN = detail.mailNo?.toString().includes('-TRN');
+                            
+                            // Filtrado local de status para evitar Error 400 de Aconex
+                            const matchStatus = !status || detail.status === status || detail.isUnread === (status === 'Unread');
+
+                            if (matchTRN && matchStatus) {
                                 batchDetails.push(detail);
                             }
                         }
