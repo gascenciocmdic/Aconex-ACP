@@ -211,37 +211,58 @@ class SyncEngine {
             const date = this.getValByBaseName(mailNode, 'DateSent') || this.getValByBaseName(mailNode, 'SentDate');
             const status = this.getValByBaseName(mailNode, 'ApprovalStatus') || this.getValByBaseName(mailNode, 'Status');
 
-            // 2. Destinatario (To -> User -> UserName)
+            // 2. Destinatario (Búsqueda robusta en To, Recipient, ToUsers)
             let toUser = 'S/D';
-            const toNode = this.findNodeByBaseName(mailNode, 'To');
+            const toNode = this.findNodeByBaseName(mailNode, 'To') || this.findNodeByBaseName(mailNode, 'ToUsers');
             if (toNode) {
                 const userNodes = this.findNodesByBaseName(toNode, 'User');
-                const names = userNodes.map(u => this.getValByBaseName(u, 'UserName')).filter(Boolean);
-                if (names.length > 0) toUser = names.join(', ');
-                else {
-                    const altNames = this.findNodesByBaseName(toNode, 'Recipient').map(r => this.getValByBaseName(r, 'Name')).filter(Boolean);
-                    if (altNames.length > 0) toUser = altNames.join(', ');
-                }
+                const recipientNodes = this.findNodesByBaseName(toNode, 'Recipient');
+                const names = [...userNodes, ...recipientNodes].map(u => 
+                    this.getValByBaseName(u, 'UserName') || 
+                    this.getValByBaseName(u, 'Name') || 
+                    this.getValByBaseName(u, 'FullName')
+                ).filter(Boolean);
+                if (names.length > 0) toUser = [...new Set(names)].join(', ');
+            } else {
+                // Si no hay nodo To/ToUsers, buscar Recipient directos en el Mail (raro pero posible)
+                const standaloneRecipients = this.findNodesByBaseName(mailNode, 'Recipient');
+                const names = standaloneRecipients.map(r => this.getValByBaseName(r, 'Name') || this.getValByBaseName(r, 'UserName')).filter(Boolean);
+                if (names.length > 0) toUser = [...new Set(names)].join(', ');
             }
 
-            // 3. Remitente (From -> User -> UserName / Organization -> Name)
+            // 3. Remitente (From / FromUserDetails / FromUser)
             let fromUser = 'S/N';
             let fromOrg = 'S/O';
-            const fromNode = this.findNodeByBaseName(mailNode, 'From');
+            const fromNode = this.findNodeByBaseName(mailNode, 'From') || 
+                             this.findNodeByBaseName(mailNode, 'FromUserDetails') || 
+                             this.findNodeByBaseName(mailNode, 'FromUser');
+            
             if (fromNode) {
-                const userNode = this.findNodeByBaseName(fromNode, 'User');
-                const orgNode = this.findNodeByBaseName(fromNode, 'Organization');
-                fromUser = this.getValByBaseName(userNode, 'UserName') || 'S/N';
-                fromOrg = this.getValByBaseName(orgNode, 'Name') || 'S/O';
+                const userNode = this.findNodeByBaseName(fromNode, 'User') || 
+                                 this.findNodeByBaseName(fromNode, 'FromUser');
+                const orgNode = this.findNodeByBaseName(fromNode, 'Organization') || 
+                                this.findNodeByBaseName(fromNode, 'OrganizationName');
+                
+                // Si fromNode es FromUserDetails, los datos pueden estar directos
+                fromUser = this.getValByBaseName(userNode, 'UserName') || 
+                           this.getValByBaseName(userNode, 'Name') || 
+                           this.getValByBaseName(fromNode, 'Name') || 
+                           this.getValByBaseName(fromNode, 'UserName') || 'S/N';
+                
+                fromOrg = this.getValByBaseName(orgNode, 'Name') || 
+                          this.getValByBaseName(orgNode, 'OrganizationName') || 
+                          this.getValByBaseName(fromNode, 'OrganizationName') || 
+                          this.getValByBaseName(fromNode, 'Organization') || 'S/O';
             }
 
             // 4. Adjuntos
-            const attachment = this.findNodeByBaseName(mailNode, 'RegisteredDocumentAttachment');
+            const attachment = this.findNodeByBaseName(mailNode, 'RegisteredDocumentAttachment') || 
+                               this.findNodeByBaseName(mailNode, 'DocumentAttachment');
             let docName = '', docRev = '', fileName = '';
             if (attachment) {
-                docName = this.getValByBaseName(attachment, 'Title');
-                docRev = this.getValByBaseName(attachment, 'Revision');
-                fileName = this.getValByBaseName(attachment, 'FileName');
+                docName = this.getValByBaseName(attachment, 'Title') || this.getValByBaseName(attachment, 'DocumentTitle');
+                docRev = this.getValByBaseName(attachment, 'Revision') || this.getValByBaseName(attachment, 'DocumentRevision');
+                fileName = this.getValByBaseName(attachment, 'FileName') || this.getValByBaseName(attachment, 'Filename');
             }
 
             return {
