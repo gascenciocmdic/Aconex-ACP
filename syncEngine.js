@@ -394,9 +394,6 @@ class SyncEngine {
                 page_number: page
             };
 
-            // Nueva sugerencia del usuario: Usar folder=unread para filtrar en el servidor
-            if (status === 'Unread') params.folder = 'unread';
-
             const xmlList = await this.client.fetchMail(params);
             const metadata = this.parseMailSearchMetadata(xmlList);
             
