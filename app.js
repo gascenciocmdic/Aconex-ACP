@@ -1292,7 +1292,7 @@ btnStartHistSync.addEventListener('click', async () => {
     // Formatear fechas a YYYYMMDD para Aconex
     const startFormatted = startStr.replace(/-/g, '');
     const endFormatted = endStr.replace(/-/g, '');
-    const searchQuery = `registered:[${startFormatted} TO ${endFormatted}]`;
+    const searchQuery = `registered:[${startFormatted} TO ${endFormatted}] AND filetype:pdf`;
 
     globalConfig.projectId = confProjectId.value.trim();
     globalConfig.region = confRegion.value;
