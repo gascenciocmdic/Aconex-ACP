@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aconex Pro Dashboard</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0f172a',
+                        darkcard: '#1e293b',
+                        brand: '#3b82f6',
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-darkbg text-slate-200 font-sans min-h-screen flex flex-col antialiased selection:bg-brand selection:text-white">
+    
+    <!-- Background Effects -->
+    <div class="fixed inset-0 z-[-1] overflow-hidden pointer-events-none">
+        <div class="absolute top-[-20%] left-[-10%] w-[70vw] h-[70vw] rounded-full bg-brand/10 blur-[120px]"></div>
+        <div class="absolute bottom-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-purple-500/10 blur-[100px]"></div>
+    </div>
+
+    <!-- Top Navigation -->
+    <nav class="sticky top-0 z-50 backdrop-blur-md bg-darkbg/80 border-b border-slate-700/50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg flex items-center justify-center font-bold text-white">A</div>
+                    <span class="text-xl font-bold tracking-tight text-white">Aconex<span class="text-brand">Panel</span></span>
+                </div>
+                <div class="flex space-x-1">
+                    <button class="nav-tab active px-4 py-2 rounded-md text-sm font-medium transition-colors" data-target="dashboard">Dashboard</button>
+                    <button class="nav-tab px-4 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-white transition-colors flex items-center gap-2" data-target="notificaciones">
+                        <div class="relative">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                            <span id="notifBadge" class="hidden absolute top-[-5px] right-[-5px] w-2 h-2 bg-red-500 rounded-full"></span>
+                        </div>
+                        Notificaciones
+                    </button>
+                    <button class="nav-tab px-4 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-white transition-colors flex items-center gap-2" data-target="admin">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        Admin
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        
+        <!-- ======================= -->
+        <!-- DASHBOARD VIEW          -->
+        <!-- ======================= -->
+        <div id="view-dashboard" class="view-section active animate-fade-in">
+            <!-- Header & Sync Actions -->
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-white">Documentos Aconex</h2>
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-2 mt-1 text-xs text-slate-400">
+                        <span>Datos extraídos mediante la orquestación masiva y ETL.</span>
+                        <span class="hidden sm:inline text-slate-600">|</span>
+                        <span id="lastSyncLabel" class="font-medium text-brand">Última sincronización: Nunca</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end w-full md:w-auto gap-3">
+                    <button id="btnClearDB" class="border border-red-500/30 hover:bg-red-500/10 text-red-400 hover:text-red-300 px-4 py-2.5 rounded-lg text-sm font-medium transition-all active:scale-95 flex items-center justify-center" title="Elimina la base de datos local para forzar una sincronización completa">
+                        <span>Restablecer BD Local</span>
+                    </button>
+                    <button id="btnStartSync" class="bg-brand hover:bg-blue-600 text-white px-6 py-2.5 rounded-lg font-medium shadow-lg shadow-brand/20 transition-all active:scale-95 flex items-center justify-center min-w-[200px]">
+                        <span>Extraer Masivamente</span>
+                    </button>
+                    <!-- Progress Bar Wrap -->
+                    <div id="progressContainer" class="hidden w-full min-w-[200px] flex-col gap-1">
+                        <div class="flex justify-between text-xs font-semibold text-slate-300">
+                            <span id="progressText">Página 0 de 0</span>
+                            <span id="progressPercent">0%</span>
+                        </div>
+                        <div class="w-full bg-slate-700 rounded-full h-2">
+                            <div id="progressBar" class="bg-brand rounded-full h-2 transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Circuit Breaker Status Banner -->
+            <div id="circuitBanner" class="hidden mb-6 bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex items-center gap-3">
+                <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                <span class="text-red-400 font-medium">Sincronización Bloqueada: El Circuit Breaker (Sentinel) detuvo la extracción debido a 2 fallos consecutivos de autenticación. Revisa el Panel Admin.</span>
+            </div>
+
+            <!-- Dashboard KPIs -->
+            <div class="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
+                <!-- Total -->
+                <div id="kpiCardAll" class="kpi-card p-4 rounded-xl cursor-pointer" onclick="toggleKPIFilter('all')">
+                    <span class="text-slate-400 text-[10px] font-bold uppercase tracking-wider block mb-1">Total Documentos</span>
+                    <div class="flex items-center justify-between">
+                        <span id="kpiTotal" class="text-2xl font-bold text-white">0</span>
+                        <div class="h-8 w-8 bg-blue-500/10 rounded-lg flex items-center justify-center text-blue-400">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div id="kpiCardPending" class="kpi-card p-4 rounded-xl border-l-4 border-l-yellow-500 cursor-pointer" onclick="toggleKPIFilter('pending')">
+                    <span class="text-slate-400 text-[10px] font-bold uppercase tracking-wider block mb-1">Pendientes</span>
+                    <div class="flex items-center justify-between">
+                        <span id="kpiPending" class="text-2xl font-bold text-white">0</span>
+                        <div class="h-8 w-8 bg-yellow-500/10 rounded-lg flex items-center justify-center text-yellow-400">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div id="kpiCardRevB" class="kpi-card p-4 rounded-xl cursor-pointer" onclick="toggleKPIFilter('revB')">
+                    <span class="text-slate-400 text-[10px] font-bold uppercase tracking-wider block mb-1">Rev B / b</span>
+                    <div class="flex items-center justify-between">
+                        <span id="kpiRevB" class="text-2xl font-bold text-white">0</span>
+                        <div class="h-8 w-8 bg-cyan-500/10 rounded-lg flex items-center justify-center text-cyan-400">
+                            <span class="font-bold text-xs text-cyan-400">B</span>
+                        </div>
+                    </div>
+                </div>
+                <div id="kpiCardRevP" class="kpi-card p-4 rounded-xl cursor-pointer" onclick="toggleKPIFilter('revP')">
+                    <span class="text-slate-400 text-[10px] font-bold uppercase tracking-wider block mb-1">Rev P / 0</span>
+                    <div class="flex items-center justify-between">
+                        <span id="kpiRevP" class="text-2xl font-bold text-white">0</span>
+                        <div class="h-8 w-8 bg-purple-500/10 rounded-lg flex items-center justify-center text-purple-400">
+                            <span class="font-bold text-xs text-purple-400">P</span>
+                        </div>
+                    </div>
+                </div>
+                <div id="kpiCardCmdic" class="kpi-card p-4 rounded-xl border-l-4 border-l-red-500 cursor-pointer" onclick="toggleKPIFilter('cmdic')">
+                    <span class="text-slate-400 text-[10px] font-bold uppercase tracking-wider block mb-1">Atrasados CMDIC</span>
+                    <div class="flex items-center justify-between">
+                        <span id="kpiDelayedCMDIC" class="text-2xl font-bold text-red-400">0</span>
+                        <div class="h-8 w-8 bg-red-500/10 rounded-lg flex items-center justify-center text-red-500">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div id="kpiCardEsed" class="kpi-card p-4 rounded-xl border-l-4 border-l-orange-500 cursor-pointer" onclick="toggleKPIFilter('esed')">
+                    <span class="text-slate-400 text-[10px] font-bold uppercase tracking-wider block mb-1">Atrasados ESED</span>
+                    <div class="flex items-center justify-between">
+                        <span id="kpiDelayedESED" class="text-2xl font-bold text-orange-400">0</span>
+                        <div class="h-8 w-8 bg-orange-500/10 rounded-lg flex items-center justify-center text-orange-500">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced Filters Row -->
+            <div class="glass-card mb-6 p-4 rounded-xl space-y-4">
+                <div class="flex flex-col md:flex-row gap-4 items-center">
+                    <div class="relative w-full md:w-1/3">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        </div>
+                        <input type="text" id="filterSearch" placeholder="Buscar por Título o DocNo..." class="block w-full pl-10 bg-slate-800/50 border border-slate-600 rounded-lg py-2 focus:ring-2 focus:ring-brand transition-all text-white placeholder-slate-400">
+                    </div>
+                    <div class="text-slate-400 text-sm ml-auto font-medium">
+                        Docs en Memoria: <span id="tblCount" class="text-white">0</span>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <!-- Estatus (Multi) -->
+                    <div class="multiselect-container" id="containerStatus">
+                        <button type="button" class="multiselect-button bg-slate-800/50 border border-slate-600 rounded-lg py-1.5 px-3 text-xs text-white focus:ring-1 focus:ring-brand">
+                            <span class="truncate">Estatus (Todos)</span>
+                            <svg class="h-3 w-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <div class="multiselect-menu" id="menuStatus"></div>
+                    </div>
+                    
+                    <select id="filterContractor" class="bg-slate-800/50 border border-slate-600 rounded-lg py-1.5 px-3 text-xs text-white focus:ring-1 focus:ring-brand appearance-none">
+                        <option value="">Contratista (Todos)</option>
+                    </select>
+                    
+                    <!-- Revisión (Multi) -->
+                    <div class="multiselect-container" id="containerRev">
+                        <button type="button" class="multiselect-button bg-slate-800/50 border border-slate-600 rounded-lg py-1.5 px-3 text-xs text-white focus:ring-1 focus:ring-brand">
+                            <span class="truncate">Rev (Todas)</span>
+                            <svg class="h-3 w-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <div class="multiselect-menu" id="menuRev"></div>
+                    </div>
+
+                    <!-- Tipo Doc (Multi) -->
+                    <div class="multiselect-container" id="containerDocType">
+                        <button type="button" class="multiselect-button bg-slate-800/50 border border-slate-600 rounded-lg py-1.5 px-3 text-xs text-white focus:ring-1 focus:ring-brand">
+                            <span class="truncate">Tipo Doc (Todos)</span>
+                            <svg class="h-3 w-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <div class="multiselect-menu" id="menuDocType"></div>
+                    </div>
+
+                    <select id="filterSpecialty" class="bg-slate-800/50 border border-slate-600 rounded-lg py-1.5 px-3 text-xs text-white focus:ring-1 focus:ring-brand appearance-none">
+                        <option value="">Disciplina (Todas)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Data Table -->
+            <div class="glass-card rounded-xl overflow-hidden border border-slate-700/50">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm whitespace-nowrap">
+                        <thead class="bg-slate-800/50 text-slate-300 uppercase text-xs font-semibold tracking-wider">
+                            <tr>
+                                <th class="px-6 py-4 cursor-pointer hover:text-brand transition-colors group" data-sort="docno">
+                                    Doc NO <span class="sort-icon opacity-0 group-hover:opacity-100 transition-opacity">↕</span>
+                                </th>
+                                <th class="px-6 py-4 cursor-pointer hover:text-brand transition-colors group" data-sort="title">
+                                    Título <span class="sort-icon opacity-0 group-hover:opacity-100 transition-opacity">↕</span>
+                                </th>
+                                <th class="px-6 py-4 cursor-pointer hover:text-brand transition-colors group" data-sort="revision">
+                                    Rev <span class="sort-icon opacity-0 group-hover:opacity-100 transition-opacity">↕</span>
+                                </th>
+                                <th class="px-6 py-4 cursor-pointer hover:text-brand transition-colors group" data-sort="status">
+                                    Estatus <span class="sort-icon opacity-0 group-hover:opacity-100 transition-opacity">↕</span>
+                                </th>
+                                <th class="px-6 py-4 cursor-pointer hover:text-brand transition-colors group" data-sort="modified_date">
+                                    F. Modificación <span class="sort-icon opacity-0 group-hover:opacity-100 transition-opacity">↕</span>
+                                </th>
+                                <th class="px-6 py-4 cursor-pointer hover:text-brand transition-colors group" data-sort="author">
+                                    Contratista <span class="sort-icon opacity-0 group-hover:opacity-100 transition-opacity">↕</span>
+                                </th>
+                                <th class="px-6 py-4 cursor-pointer hover:text-brand transition-colors group" data-sort="specialty">
+                                    Función o Disciplina <span class="sort-icon opacity-0 group-hover:opacity-100 transition-opacity">↕</span>
+                                </th>
+                                <th class="px-6 py-4 cursor-pointer hover:text-brand transition-colors group" data-sort="doc_type">
+                                    Tipo Documento <span class="sort-icon opacity-0 group-hover:opacity-100 transition-opacity">↕</span>
+                                </th>
+                                <th class="px-6 py-4 cursor-pointer hover:text-brand transition-colors group" data-sort="contract">
+                                    Contrato <span class="sort-icon opacity-0 group-hover:opacity-100 transition-opacity">↕</span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody" class="divide-y divide-slate-700/50 text-slate-300">
+                            <!-- Table rows will be rendered here -->
+                            <tr>
+                                <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                                    Aún no hay documentos en la base de datos local. Ejecuta la sincronización masiva.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Documents Pagination -->
+            <div class="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-900/30 p-4 rounded-xl border border-slate-700/50">
+                <div class="flex items-center gap-3">
+                    <label class="text-xs text-slate-400">Mostrar:</label>
+                    <select id="docPagingSize" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-300 outline-none focus:ring-1 focus:ring-brand">
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="200">200</option>
+                        <option value="500">500</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="docPrev" class="p-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-brand disabled:opacity-30 disabled:cursor-not-allowed">
+                        <i class="fas fa-chevron-left text-xs"></i>
+                    </button>
+                    <div id="docPagingInfo" class="text-xs text-slate-300 font-medium bg-slate-800 px-4 py-2 rounded-lg border border-slate-700">
+                        Página <span id="docCurrentPage">1</span> de <span id="docTotalPages">1</span>
+                    </div>
+                    <button id="docNext" class="p-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-brand disabled:opacity-30 disabled:cursor-not-allowed">
+                        <i class="fas fa-chevron-right text-xs"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================= -->
+        <!-- NOTIFICACIONES VIEW     -->
+        <!-- ======================= -->
+        <div id="view-notificaciones" class="view-section hidden animate-fade-in">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-white">Listado de Transmittals</h2>
+                    <p class="text-slate-400 text-sm mt-1">Todos los registros de correspondencia de tipo Transmittal en el proyecto.</p>
+                </div>
+                <button id="btnRefreshNotif" class="bg-brand hover:bg-brand-hover text-white px-6 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 shadow-lg shadow-brand/20 transition-all">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    Extraer Transmittals
+                </button>
+            </div>
+
+            <!-- FILTERS FOR TRANSMITTALS -->
+            <div class="glass-card mb-6 p-4 rounded-xl border border-slate-700/50 flex flex-wrap gap-4 items-center">
+                <div class="flex-1 min-w-[200px]">
+                    <div class="relative">
+                        <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        <input type="text" id="filterTransSearch" placeholder="Buscar por asunto o remitente..." class="w-full bg-slate-900/50 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition-all">
+                    </div>
+                </div>
+                <select id="filterTransUser" class="bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 outline-none focus:ring-1 focus:ring-brand">
+                    <option value="">Remitente (Todos)</option>
+                </select>
+                <select id="filterTransOrg" class="bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 outline-none focus:ring-1 focus:ring-brand">
+                    <option value="">Organización (Todos)</option>
+                </select>
+                <select id="filterTransRecipient" class="bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 outline-none focus:ring-1 focus:ring-brand">
+                    <option value="">Destinatario (Todos)</option>
+                </select>
+                <select id="filterTransStatus" class="bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 outline-none focus:ring-1 focus:ring-brand">
+                    <option value="">Estatus (Todos)</option>
+                </select>
+                <div class="flex items-center gap-2 px-3 py-2 bg-slate-800/50 rounded-lg border border-slate-700">
+                    <input type="checkbox" id="filterTransUnread" class="w-4 h-4 rounded border-slate-700 text-brand focus:ring-brand bg-slate-900">
+                    <label for="filterTransUnread" class="text-xs text-slate-400 cursor-pointer select-none">Solo no leídos</label>
+                </div>
+                <div class="flex items-center gap-2 px-3 py-2 bg-slate-800/50 rounded-lg border border-slate-700 text-xs text-slate-400">
+                    <span id="transCount" class="font-bold text-brand">0</span> registros
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl overflow-hidden border border-slate-700/50">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm whitespace-nowrap">
+                        <thead class="bg-slate-800/50 text-slate-300 uppercase text-xs font-semibold tracking-wider">
+                            <tr>
+                                <th class="px-6 py-4 cursor-pointer hover:text-brand transition-colors group" data-sort-trans="date">
+                                    Fecha <span class="sort-icon opacity-30">↕</span>
+                                </th>
+                                <th class="px-6 py-4 cursor-pointer hover:text-brand transition-colors group" data-sort-trans="mailNo">
+                                    ID / Correo <span class="sort-icon opacity-30">↕</span>
+                                </th>
+                                <th class="px-6 py-4 cursor-pointer hover:text-brand transition-colors group" data-sort-trans="subject">
+                                    Asunto <span class="sort-icon opacity-30">↕</span>
+                                </th>
+                                <th class="px-6 py-4">Remitente</th>
+                                <th class="px-6 py-4">Destinatario</th>
+                                <th class="px-6 py-4">Estatus</th>
+                                <th class="px-6 py-4">Documento / Rev / Archivo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="notifTableBody" class="divide-y divide-slate-700/50 text-slate-300">
+                            <tr>
+                                <td colspan="4" class="px-6 py-12 text-center text-slate-500 italic">
+                                    Presiona "Extraer Transmittals" para obtener el listado completo...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Transmittal Pagination -->
+            <div class="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-900/30 p-4 rounded-xl border border-slate-700/50">
+                <div class="flex items-center gap-3">
+                    <label class="text-xs text-slate-400">Mostrar:</label>
+                    <select id="transPagingSize" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-300 outline-none focus:ring-1 focus:ring-brand">
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="200">200</option>
+                        <option value="500">500</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="transPrev" class="p-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-brand disabled:opacity-30 disabled:cursor-not-allowed">
+                        <i class="fas fa-chevron-left text-xs"></i>
+                    </button>
+                    <div id="transPagingInfo" class="text-xs text-slate-300 font-medium bg-slate-800 px-4 py-2 rounded-lg border border-slate-700">
+                        Página <span id="transCurrentPage">1</span> de <span id="transTotalPages">1</span>
+                    </div>
+                    <button id="transNext" class="p-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-brand disabled:opacity-30 disabled:cursor-not-allowed">
+                        <i class="fas fa-chevron-right text-xs"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ADMIN PANEL VIEW        -->
+        <!-- ======================= -->
+        <div id="view-admin" class="view-section hidden animate-fade-in max-w-3xl mx-auto">
+            <h2 class="text-2xl font-bold text-white mb-6">Configuración del Sistema</h2>
+            
+            <div class="glass-card rounded-xl p-8 border border-slate-700/50">
+                <form id="adminForm" class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-1">App Key</label>
+                        <input type="text" id="confAppKey" value="827ccb23-a96e-4e49-be99-d7263c7a8ab4" class="block w-full bg-slate-800/80 border border-slate-600 rounded-lg py-2.5 px-3 focus:ring-2 focus:ring-brand text-white font-mono text-sm">
+                    </div>
+
+                        <!-- Región y ID Proyecto -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="space-y-1.5">
+                                <label class="text-[10px] uppercase tracking-wider text-slate-500 font-bold ml-1">Región Aconex</label>
+                                <select id="confRegion" class="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2.5 text-slate-200 focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition-all appearance-none">
+                                    <option value="us1">US1 (Americas)</option>
+                                    <option value="au1">AU1 (Australia/Asia)</option>
+                                    <option value="uk1">UK1 (UK)</option>
+                                    <option value="eu1">EU1 (Europe)</option>
+                                </select>
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-[10px] uppercase tracking-wider text-slate-500 font-bold ml-1">ID Proyecto</label>
+                                <input type="text" id="confProjectId" value="2147484043" class="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2.5 text-slate-200 focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition-all placeholder:text-slate-600">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-1">Paginación (Docs por Hoja)</label>
+                            <select id="confPageSize" class="block w-full bg-slate-800/80 border border-slate-600 rounded-lg py-2.5 px-3 focus:ring-2 focus:ring-brand text-white">
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                                <option value="200" selected>200</option>
+                                <option value="500">500 (Máximo)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-1">Filtro de Nombre (Opcional)</label>
+                            <input type="text" id="confFilterName" placeholder="Ej: Reportes" class="block w-full bg-slate-800/80 border border-slate-600 rounded-lg py-2.5 px-3 focus:ring-2 focus:ring-brand text-white">
+                        </div>
+                        
+                        <!-- Sincronización Automática -->
+                        <div class="p-4 bg-slate-900/40 border border-slate-700/50 rounded-lg space-y-3">
+                            <h3 class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Sincronización Automática</h3>
+                            <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+                                <div class="flex items-center gap-2">
+                                    <input type="checkbox" id="syncAutoActive" class="w-4 h-4 rounded border-slate-700 text-brand focus:ring-brand bg-slate-800/80">
+                                    <label for="syncAutoActive" class="text-sm text-slate-300 cursor-pointer select-none">Activar autogestión de sincronización</label>
+                                </div>
+                                <div class="flex items-center gap-2 flex-grow sm:justify-end">
+                                    <label for="syncAutoInterval" class="text-xs text-slate-400">Frecuencia:</label>
+                                    <select id="syncAutoInterval" class="bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-brand">
+                                        <option value="5">Cada 5 minutos</option>
+                                        <option value="15">Cada 15 minutos</option>
+                                        <option value="30">Cada 30 minutos</option>
+                                        <option value="60">Cada 1 hora</option>
+                                        <option value="120">Cada 2 horas</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-1">Usuario Auth Basic</label>
+                            <input type="text" id="confUser" placeholder="tu_usuario" class="block w-full bg-slate-800/80 border border-slate-600 rounded-lg py-2.5 px-3 focus:ring-2 focus:ring-brand text-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-1">Contraseña Auth Basic</label>
+                            <div class="relative">
+                                <input type="password" id="confPass" placeholder="••••••••" class="block w-full bg-slate-800/80 border border-slate-600 rounded-lg py-2.5 px-3 pr-10 focus:ring-2 focus:ring-brand text-white">
+                                <button type="button" id="btnTogglePass" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white transition-colors" title="Mostrar/Ocultar Contraseña">
+                                    <svg id="iconEyeOpen" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                    <svg id="iconEyeClosed" class="w-5 h-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-6 border-t border-slate-700/50 flex flex-col md:flex-row justify-between items-center gap-4">
+                        <button type="button" id="btnTestConn" class="w-full md:w-auto px-6 py-2.5 rounded-lg font-medium border border-slate-600 hover:bg-slate-700 hover:text-white transition-colors flex items-center justify-center gap-2">
+                            <span>Test Connection</span>
+                        </button>
+                        
+                        <button type="submit" class="w-full md:w-auto bg-brand hover:bg-blue-600 text-white px-8 py-2.5 rounded-lg font-medium shadow-lg transition-colors">
+                            Guardar Configuración
+                        </button>
+                    </div>
+
+                    <!-- Test Result Message -->
+                    <div id="testResultContainer" class="hidden mt-4 p-3 rounded-lg text-sm text-center font-medium">
+                        <!-- Result text injected via JS -->
+                    </div>
+
+                    <!-- Technical Debug Log (Solución de Problemas) -->
+                    <div class="mt-8 pt-6 border-t border-slate-700/50">
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Log Técnico (Respuesta XML Cruda)</label>
+                        <textarea id="techLog" readonly class="w-full h-40 bg-slate-900/80 border border-slate-700 rounded-lg p-3 font-mono text-[10px] text-slate-400 focus:outline-none" placeholder="Aquí aparecerá la respuesta del servidor para depuración..."></textarea>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </main>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
