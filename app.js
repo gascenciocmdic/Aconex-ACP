@@ -870,7 +870,7 @@ function getLastSyncSearchQuery() {
     const yyyy = date.getUTCFullYear();
     const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
     const dd = String(date.getUTCDate()).padStart(2, '0');
-    return `lastmodified:[${yyyy}${mm}${dd} TO *]`;
+    return `registered:[${yyyy}${mm}${dd} TO *]`;
 }
 
 function updateLastSyncUI() {
@@ -1292,7 +1292,7 @@ btnStartHistSync.addEventListener('click', async () => {
     // Formatear fechas a YYYYMMDD para Aconex
     const startFormatted = startStr.replace(/-/g, '');
     const endFormatted = endStr.replace(/-/g, '');
-    const searchQuery = `lastmodified:[${startFormatted} TO ${endFormatted}]`;
+    const searchQuery = `registered:[${startFormatted} TO ${endFormatted}]`;
 
     globalConfig.projectId = confProjectId.value.trim();
     globalConfig.region = confRegion.value;
