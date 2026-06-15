@@ -1,5 +1,7 @@
 import SyncEngine from './syncEngine.js';
 import AconexClient from './aconexApi.js';
+import { HITO_360_DOCS } from './hito360.js';
+
 
 // DOM Elements
 const tabs = document.querySelectorAll('.nav-tab');
@@ -41,6 +43,12 @@ const filterSearch = document.getElementById('filterSearch');
 const filterContractor = document.getElementById('filterContractor');
 const filterSpecialty = document.getElementById('filterSpecialty');
 const confPageSize = document.getElementById('confPageSize');
+
+// Hito 360 Switch buttons
+const btnHitoAll = document.getElementById('btnHitoAll');
+const btnHito360 = document.getElementById('btnHito360');
+const btnHistHitoAll = document.getElementById('btnHistHitoAll');
+const btnHistHito360 = document.getElementById('btnHistHito360');
 
 // Notification UI
 const notifTableBody = document.getElementById('notifTableBody');
@@ -169,6 +177,8 @@ let selectedFilters = {
     doc_type: []
 };
 let currentKPIFilter = null; // 'all', 'pending', 'revB', 'revP', 'cmdic', 'esed'
+let currentHitoFilter = 'all'; // 'all', 'hito360'
+let currentHistHitoFilter = 'all'; // 'all', 'hito360'
 
 // ======================================
 // 1. Navigation Logic
@@ -340,7 +350,13 @@ function applyFilters(data) {
             }
         }
         
-        return matchQ && matchS && matchC && matchR && matchT && matchSpec && matchKPI;
+        // Hito 360 Filter Logic
+        let matchHito = true;
+        if (currentHitoFilter === 'hito360') {
+            matchHito = doc.docno && HITO_360_DOCS.includes(doc.docno);
+        }
+        
+        return matchQ && matchS && matchC && matchR && matchT && matchSpec && matchKPI && matchHito;
     });
 }
 
@@ -1125,13 +1141,119 @@ function applyHistoryFilters(data) {
         const matchC = !contractorF || doc.author === contractorF;
         const matchSpec = !specialtyF || doc.specialty === specialtyF;
         
-        return matchQ && matchS && matchC && matchR && matchT && matchSpec;
+        // Hito 360 Filter Logic
+        let matchHito = true;
+        if (currentHistHitoFilter === 'hito360') {
+            matchHito = doc.docno && HITO_360_DOCS.includes(doc.docno);
+        }
+        
+        return matchQ && matchS && matchC && matchR && matchT && matchSpec && matchHito;
     });
+}
+
+function updateHistorySummaryTables() {
+    try {
+        const query = (filterHistSearch ? filterHistSearch.value : '').trim().toLowerCase();
+        const contractorF = filterHistContractor ? filterHistContractor.value : '';
+        const specialtyF = filterHistSpecialty ? filterHistSpecialty.value : '';
+        
+        const summaryDocs = historyDB.filter(doc => {
+            const matchQ = !query || (doc.docno && doc.docno.toLowerCase().includes(query)) || (doc.title && doc.title.toLowerCase().includes(query));
+            const matchC = !contractorF || doc.author === contractorF;
+            const matchSpec = !specialtyF || doc.specialty === specialtyF;
+            
+            let matchHito = true;
+            if (currentHistHitoFilter === 'hito360') {
+                matchHito = doc.docno && HITO_360_DOCS.includes(doc.docno);
+            }
+            
+            return matchQ && matchC && matchSpec && matchHito;
+        });
+        
+        const targetDocs = summaryDocs.filter(doc => {
+            const s = (doc.status || '').toLowerCase().trim();
+            return s === 'emitido para estudio' || s === 'respuesta requerida';
+        });
+        
+        let revB_cant = 0;
+        let revB_crit = 0;
+        let revP_cant = 0;
+        let revP_crit = 0;
+        
+        targetDocs.forEach(doc => {
+            const rev = (doc.revision || '').trim().toUpperCase();
+            const isCrit = doc.docno && HITO_360_DOCS.includes(doc.docno);
+            
+            const isRevP = rev.startsWith('P') || /^\d/.test(rev);
+            if (isRevP) {
+                revP_cant++;
+                if (isCrit) revP_crit++;
+            } else if (rev.length > 0) {
+                revB_cant++;
+                if (isCrit) revB_crit++;
+            }
+        });
+        
+        const totalCant = revB_cant + revP_cant;
+        const totalCrit = revB_crit + revP_crit;
+        
+        const sumRevBCant = document.getElementById('sumRevBCant');
+        const sumRevBCrit = document.getElementById('sumRevBCrit');
+        const sumRevPCant = document.getElementById('sumRevPCant');
+        const sumRevPCrit = document.getElementById('sumRevPCrit');
+        const sumRevTotalCant = document.getElementById('sumRevTotalCant');
+        const sumRevTotalCrit = document.getElementById('sumRevTotalCrit');
+        
+        if (sumRevBCant) sumRevBCant.textContent = revB_cant;
+        if (sumRevBCrit) sumRevBCrit.textContent = revB_crit;
+        if (sumRevPCant) sumRevPCant.textContent = revP_cant;
+        if (sumRevPCrit) sumRevPCrit.textContent = revP_crit;
+        if (sumRevTotalCant) sumRevTotalCant.textContent = totalCant;
+        if (sumRevTotalCrit) sumRevTotalCrit.textContent = totalCrit;
+        
+        const contractorMap = {};
+        targetDocs.forEach(doc => {
+            const contractor = doc.author || 'N/A';
+            const isCrit = doc.docno && HITO_360_DOCS.includes(doc.docno);
+            
+            if (!contractorMap[contractor]) {
+                contractorMap[contractor] = { cant: 0, crit: 0 };
+            }
+            contractorMap[contractor].cant++;
+            if (isCrit) contractorMap[contractor].crit++;
+        });
+        
+        const contractorList = Object.keys(contractorMap).map(name => {
+            return {
+                name: name,
+                cant: contractorMap[name].cant,
+                crit: contractorMap[name].crit
+            };
+        }).sort((a, b) => b.cant - a.cant || a.name.localeCompare(b.name));
+        
+        const contractorBody = document.getElementById('summaryContractorBody');
+        if (contractorBody) {
+            if (contractorList.length === 0) {
+                contractorBody.innerHTML = `<tr><td colspan="3" class="px-4 py-8 text-center text-slate-500 italic font-sans">Aún no hay datos de contratistas cargados.</td></tr>`;
+            } else {
+                contractorBody.innerHTML = contractorList.map(c => `
+                    <tr class="hover:bg-slate-800/50 border-b border-slate-700/20">
+                        <td class="px-4 py-3 font-semibold font-sans text-slate-200 truncate max-w-[200px]" title="${c.name}">${c.name}</td>
+                        <td class="px-4 py-3 text-center font-medium">${c.cant}</td>
+                        <td class="px-4 py-3 text-center font-bold text-cyan-400">${c.crit}</td>
+                    </tr>
+                `).join('');
+            }
+        }
+    } catch (e) {
+        console.error("Error updating history summary tables:", e);
+    }
 }
 
 function renderHistoryTable() {
     try {
         let filtered = applyHistoryFilters(historyDB);
+        updateHistorySummaryTables();
         
         // Ordenamiento
         filtered.sort((a, b) => {
@@ -1413,3 +1535,40 @@ document.querySelectorAll('th[data-sort-hist]').forEach(th => {
         renderHistoryTable();
     });
 });
+
+// Eventos para el Switch de Hito 360 en Dashboard y Historial
+if (btnHitoAll && btnHito360) {
+    btnHitoAll.addEventListener('click', () => {
+        currentHitoFilter = 'all';
+        btnHitoAll.className = "px-4 py-1.5 rounded-md text-xs font-semibold bg-brand text-white transition-all shadow-md";
+        btnHito360.className = "px-4 py-1.5 rounded-md text-xs font-semibold text-slate-400 hover:text-white transition-all";
+        docCurrentPage = 1;
+        renderTable();
+    });
+
+    btnHito360.addEventListener('click', () => {
+        currentHitoFilter = 'hito360';
+        btnHito360.className = "px-4 py-1.5 rounded-md text-xs font-semibold bg-brand text-white transition-all shadow-md";
+        btnHitoAll.className = "px-4 py-1.5 rounded-md text-xs font-semibold text-slate-400 hover:text-white transition-all";
+        docCurrentPage = 1;
+        renderTable();
+    });
+}
+
+if (btnHistHitoAll && btnHistHito360) {
+    btnHistHitoAll.addEventListener('click', () => {
+        currentHistHitoFilter = 'all';
+        btnHistHitoAll.className = "px-4 py-1.5 rounded-md text-xs font-semibold bg-brand text-white transition-all shadow-md";
+        btnHistHito360.className = "px-4 py-1.5 rounded-md text-xs font-semibold text-slate-400 hover:text-white transition-all";
+        histCurrentPage = 1;
+        renderHistoryTable();
+    });
+
+    btnHistHito360.addEventListener('click', () => {
+        currentHistHitoFilter = 'hito360';
+        btnHistHito360.className = "px-4 py-1.5 rounded-md text-xs font-semibold bg-brand text-white transition-all shadow-md";
+        btnHistHitoAll.className = "px-4 py-1.5 rounded-md text-xs font-semibold text-slate-400 hover:text-white transition-all";
+        histCurrentPage = 1;
+        renderHistoryTable();
+    });
+}
