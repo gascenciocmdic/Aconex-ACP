@@ -1215,31 +1215,41 @@ function updateHistorySummaryTables() {
         targetDocs.forEach(doc => {
             const contractor = doc.author || 'N/A';
             const isCrit = doc.docno && HITO_360_DOCS.includes(doc.docno);
+            const rev = (doc.revision || '').trim().toUpperCase();
+            const isRevP = rev.startsWith('P') || /^\d/.test(rev);
             
             if (!contractorMap[contractor]) {
-                contractorMap[contractor] = { cant: 0, crit: 0 };
+                contractorMap[contractor] = { revB: 0, revP: 0, crit: 0 };
             }
-            contractorMap[contractor].cant++;
+            if (isRevP) {
+                contractorMap[contractor].revP++;
+            } else if (rev.length > 0) {
+                contractorMap[contractor].revB++;
+            }
             if (isCrit) contractorMap[contractor].crit++;
         });
         
         const contractorList = Object.keys(contractorMap).map(name => {
+            const c = contractorMap[name];
             return {
                 name: name,
-                cant: contractorMap[name].cant,
-                crit: contractorMap[name].crit
+                revB: c.revB,
+                revP: c.revP,
+                total: c.revB + c.revP,
+                crit: c.crit
             };
-        }).sort((a, b) => b.cant - a.cant || a.name.localeCompare(b.name));
+        }).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
         
         const contractorBody = document.getElementById('summaryContractorBody');
         if (contractorBody) {
             if (contractorList.length === 0) {
-                contractorBody.innerHTML = `<tr><td colspan="3" class="px-4 py-8 text-center text-slate-500 italic font-sans">Aún no hay datos de contratistas cargados.</td></tr>`;
+                contractorBody.innerHTML = `<tr><td colspan="4" class="px-4 py-8 text-center text-slate-500 italic font-sans">Aún no hay datos de contratistas cargados.</td></tr>`;
             } else {
                 contractorBody.innerHTML = contractorList.map(c => `
                     <tr class="hover:bg-slate-800/50 border-b border-slate-700/20">
                         <td class="px-4 py-3 font-semibold font-sans text-slate-200 truncate max-w-[200px]" title="${c.name}">${c.name}</td>
-                        <td class="px-4 py-3 text-center font-medium">${c.cant}</td>
+                        <td class="px-4 py-3 text-center font-medium">${c.revB}</td>
+                        <td class="px-4 py-3 text-center font-medium">${c.revP}</td>
                         <td class="px-4 py-3 text-center font-bold text-cyan-400">${c.crit}</td>
                     </tr>
                 `).join('');
