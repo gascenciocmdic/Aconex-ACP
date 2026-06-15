@@ -105,7 +105,7 @@ let histSortState = {
 };
 // Load Config fields from localStorage on startup
 try {
-    confProjectId.value = localStorage.getItem('aconex_project_id') || '2147484043';
+    confProjectId.value = localStorage.getItem('aconex_project_id') || '1207991304';
     confRegion.value = localStorage.getItem('aconex_region') || 'us1';
     confUser.value = localStorage.getItem('aconex_username') || '';
     confPass.value = localStorage.getItem('aconex_password') || '';
