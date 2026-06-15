@@ -886,7 +886,7 @@ function getLastSyncSearchQuery() {
     const yyyy = date.getUTCFullYear();
     const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
     const dd = String(date.getUTCDate()).padStart(2, '0');
-    return `registered:[${yyyy}${mm}${dd} TO *]`;
+    return `registered:[${yyyy}${mm}${dd} TO 20991231]`;
 }
 
 function updateLastSyncUI() {
