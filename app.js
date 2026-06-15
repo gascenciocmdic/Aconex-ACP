@@ -103,11 +103,21 @@ let histSortState = {
     field: 'modified_date',
     direction: 'desc'
 };
+// Load Config fields from localStorage on startup
+try {
+    confProjectId.value = localStorage.getItem('aconex_project_id') || '2147484043';
+    confRegion.value = localStorage.getItem('aconex_region') || 'us1';
+    confUser.value = localStorage.getItem('aconex_username') || '';
+    confPass.value = localStorage.getItem('aconex_password') || '';
+} catch (e) {
+    console.warn("Error loading config fields from localStorage:", e);
+}
+
 let globalConfig = {
-    projectId: confProjectId.value,
+    projectId: confProjectId.value.trim(),
     region: confRegion.value,
-    username: '',
-    password: ''
+    username: confUser.value.trim(),
+    password: confPass.value.trim()
 };
 
 let sortState = {
@@ -194,6 +204,12 @@ adminForm.addEventListener('submit', (e) => {
     globalConfig.region = confRegion.value;
     globalConfig.username = confUser.value.trim();
     globalConfig.password = confPass.value.trim();
+    
+    // Guardar en localStorage
+    localStorage.setItem('aconex_project_id', globalConfig.projectId);
+    localStorage.setItem('aconex_region', globalConfig.region);
+    localStorage.setItem('aconex_username', globalConfig.username);
+    localStorage.setItem('aconex_password', globalConfig.password);
     
     // Switch to dashboard
     tabs[0].click();
@@ -629,7 +645,7 @@ async function syncNotifications() {
 
     if (!globalConfig.username || !globalConfig.password) {
         alert("Por favor, ingresa tus credenciales en el Panel Admin antes de extraer Transmittals.");
-        tabs[1].click(); // Redirigir a Admin
+        tabs[3].click(); // Redirigir a Admin
         return;
     }
 
@@ -888,7 +904,7 @@ async function executeSync({ silent = false } = {}) {
     if (!globalConfig.username || !globalConfig.password) {
         if (!silent) {
             alert("Por favor, configura las credenciales en el Panel Admin.");
-            tabs[1].click();
+            tabs[3].click();
         }
         return;
     }
@@ -1285,7 +1301,7 @@ btnStartHistSync.addEventListener('click', async () => {
 
     if (!globalConfig.username || !globalConfig.password) {
         alert("Por favor, configura las credenciales en el Panel Admin.");
-        tabs[2].click(); // Redirigir a Admin (ahora es el tab index 2)
+        tabs[3].click(); // Redirigir a Admin (ahora es el tab index 3)
         return;
     }
 
