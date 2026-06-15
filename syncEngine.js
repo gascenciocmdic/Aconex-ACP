@@ -118,7 +118,8 @@ class SyncEngine {
                     specialty: getTxt(['SelectList3', 'Especialidad', 'Specialty', 'Disciplina']),
                     contract: getTxt(['SelectList4', 'Contrato', 'ContractNumber']),
                     author: getTxt(['Author', 'CreatedBy']),
-                    doc_type: getTxt(['DocumentType', 'Doctype', 'Tipo Doc'])
+                    doc_type: getTxt(['DocumentType', 'Doctype', 'Tipo Doc']),
+                    version: getTxt(['VersionNumber', 'Version', 'VersionNo'])
                 });
             });
         } catch (e) {
@@ -367,7 +368,7 @@ class SyncEngine {
         }
     }
 
-    async syncAllData({ onStart, onProgress, onDocumentUpsert, onCircuitBreakerTrip, onFinish, onError, onRawResponse, pageSize = 200, searchQuery }) {
+    async syncAllData({ onStart, onProgress, onDocumentUpsert, onCircuitBreakerTrip, onFinish, onError, onRawResponse, pageSize = 200, searchQuery, showDocumentHistory }) {
         try {
             if (onStart) onStart();
 
@@ -380,6 +381,9 @@ class SyncEngine {
 
             if (searchQuery) {
                 params.search_query = searchQuery;
+            }
+            if (showDocumentHistory) {
+                params.show_document_history = 'true';
             }
 
             const initialXml = await this.client.fetchProjects(params, onCircuitBreakerTrip);

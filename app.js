@@ -53,6 +53,24 @@ const filterTransStatus = document.getElementById('filterTransStatus');
 const filterTransUnread = document.getElementById('filterTransUnread');
 const transCount = document.getElementById('transCount');
 
+// History UI
+const histWeekSelect = document.getElementById('histWeekSelect');
+const histDateStart = document.getElementById('histDateStart');
+const histDateEnd = document.getElementById('histDateEnd');
+const btnStartHistSync = document.getElementById('btnStartHistSync');
+const histProgressContainer = document.getElementById('histProgressContainer');
+const histProgressText = document.getElementById('histProgressText');
+const histProgressPercent = document.getElementById('histProgressPercent');
+const histProgressBar = document.getElementById('histProgressBar');
+const tableHistBody = document.getElementById('tableHistBody');
+const tblHistCount = document.getElementById('tblHistCount');
+const filterHistSearch = document.getElementById('filterHistSearch');
+const filterHistContractor = document.getElementById('filterHistContractor');
+const filterHistSpecialty = document.getElementById('filterHistSpecialty');
+const histPagingSize = document.getElementById('histPagingSize');
+const histPrev = document.getElementById('histPrev');
+const histNext = document.getElementById('histNext');
+
 // State
 let localDB = []; 
 try {
@@ -66,6 +84,7 @@ try {
 } catch (e) {
     localTransmittalsDB = [];
 }
+let historyDB = [];
 let isSyncing = false;
 
 // Pagination State
@@ -73,6 +92,17 @@ let docCurrentPage = 1;
 let docPageSize = 50;
 let transCurrentPage = 1;
 let transPageSize = 50;
+let histCurrentPage = 1;
+let histPageSize = 50;
+let selectedHistFilters = {
+    status: [],
+    revision: [],
+    doc_type: []
+};
+let histSortState = {
+    field: 'modified_date',
+    direction: 'desc'
+};
 let globalConfig = {
     projectId: confProjectId.value,
     region: confRegion.value,
@@ -143,6 +173,10 @@ tabs.forEach(tab => {
                 v.classList.remove('hidden');
                 v.classList.add('active');
                 if (target === 'notificaciones') syncNotifications();
+                if (target === 'historial') {
+                    populateWorkWeeks();
+                    renderHistoryTable();
+                }
             } else {
                 v.classList.add('hidden');
                 v.classList.remove('active');
@@ -992,3 +1026,374 @@ updateLastSyncUI();
 updateFilterOptions();
 renderTable();
 setupAutoSyncScheduler();
+
+// ======================================
+// 6. Document History Tab Logic
+// ======================================
+
+function populateWorkWeeks() {
+    if (histWeekSelect.children.length > 1) return; // Ya está cargado
+    
+    const months = [
+        "enero", "febrero", "marzo", "abril", "mayo", "junio", 
+        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+    ];
+    
+    // Obtener lunes de esta semana (en hora local, truncado)
+    const today = new Date();
+    const day = today.getDay();
+    const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+    const currentMonday = new Date(today.setDate(diff));
+    currentMonday.setHours(0,0,0,0);
+    
+    let html = '<option value="">-- Cargar Semana --</option>';
+    
+    for (let i = 0; i < 12; i++) {
+        const mon = new Date(currentMonday);
+        mon.setDate(mon.getDate() - (i * 7));
+        
+        const fri = new Date(mon);
+        fri.setDate(fri.getDate() + 4);
+        
+        // Formatear fechas para mostrar al usuario (ej. 8 - 12 de junio)
+        const monDay = mon.getDate();
+        const monMonth = months[mon.getMonth()];
+        const friDay = fri.getDate();
+        const friMonth = months[fri.getMonth()];
+        
+        let weekText = "";
+        if (mon.getMonth() === fri.getMonth()) {
+            weekText = `${monDay} - ${friDay} de ${monMonth}`;
+        } else {
+            weekText = `${monDay} de ${monMonth} - ${friDay} de ${friMonth}`;
+        }
+        
+        if (i === 0) {
+            weekText = `Esta semana (${weekText})`;
+        } else if (i === 1) {
+            weekText = `Semana anterior (${weekText})`;
+        }
+        
+        // Fechas en formato YYYY-MM-DD para cargar en los inputs
+        const monVal = mon.toISOString().split('T')[0];
+        const friVal = fri.toISOString().split('T')[0];
+        
+        html += `<option value="${monVal}|${friVal}">${weekText}</option>`;
+    }
+    histWeekSelect.innerHTML = html;
+}
+
+histWeekSelect.addEventListener('change', () => {
+    const val = histWeekSelect.value;
+    if (!val) return;
+    const [start, end] = val.split('|');
+    histDateStart.value = start;
+    histDateEnd.value = end;
+    histCurrentPage = 1;
+});
+
+function applyHistoryFilters(data) {
+    const query = filterHistSearch.value.toLowerCase().trim();
+    const contractorF = filterHistContractor.value;
+    const specialtyF = filterHistSpecialty.value;
+
+    return data.filter(doc => {
+        const matchQ = !query || (doc.docno && doc.docno.toLowerCase().includes(query)) || (doc.title && doc.title.toLowerCase().includes(query));
+        
+        // Multi-selects
+        const matchS = selectedHistFilters.status.length === 0 || selectedHistFilters.status.includes(doc.status);
+        const matchR = selectedHistFilters.revision.length === 0 || selectedHistFilters.revision.includes(doc.revision);
+        const matchT = selectedHistFilters.doc_type.length === 0 || selectedHistFilters.doc_type.includes(doc.doc_type);
+        
+        // Single selects
+        const matchC = !contractorF || doc.author === contractorF;
+        const matchSpec = !specialtyF || doc.specialty === specialtyF;
+        
+        return matchQ && matchS && matchC && matchR && matchT && matchSpec;
+    });
+}
+
+function renderHistoryTable() {
+    try {
+        let filtered = applyHistoryFilters(historyDB);
+        
+        // Ordenamiento
+        filtered.sort((a, b) => {
+            let valA = a[histSortState.field] || '';
+            let valB = b[histSortState.field] || '';
+            
+            if (histSortState.field === 'modified_date') {
+                valA = new Date(valA).getTime() || 0;
+                valB = new Date(valB).getTime() || 0;
+            } else {
+                valA = valA.toString().toLowerCase();
+                valB = valB.toString().toLowerCase();
+            }
+
+            if (valA < valB) return histSortState.direction === 'asc' ? -1 : 1;
+            if (valA > valB) return histSortState.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        tblHistCount.textContent = filtered.length;
+
+        // Paginación
+        const totalPages = Math.ceil(filtered.length / histPageSize) || 1;
+        if (histCurrentPage > totalPages) histCurrentPage = totalPages;
+        
+        const start = (histCurrentPage - 1) * histPageSize;
+        const end = start + histPageSize;
+        const paginated = filtered.slice(start, end);
+
+        document.getElementById('histCurrentPage').textContent = histCurrentPage;
+        document.getElementById('histTotalPages').textContent = totalPages;
+        histPrev.disabled = (histCurrentPage <= 1);
+        histNext.disabled = (histCurrentPage >= totalPages);
+
+        if (paginated.length === 0) {
+            tableHistBody.innerHTML = `<tr><td colspan="10" class="px-6 py-8 text-center text-slate-500 italic">No se encontraron registros en el historial.</td></tr>`;
+            return;
+        }
+
+        let html = '';
+        paginated.forEach(doc => {
+            let displayDate = doc.modified_date;
+            if (displayDate) {
+                const date = new Date(displayDate);
+                if (!isNaN(date)) {
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const year = date.getFullYear();
+                    displayDate = `${day}-${month}-${year}`;
+                }
+            }
+
+            html += `
+                <tr class="hover:bg-slate-800/80 transition-colors border-b border-slate-700/30">
+                    <td class="px-6 py-4 font-mono text-xs text-brand font-bold">${doc.docno}</td>
+                    <td class="px-6 py-4 truncate max-w-[200px]" title="${doc.title}">${doc.title || 'S/T'}</td>
+                    <td class="px-6 py-4 text-center font-semibold text-xs">${doc.revision || '-'}</td>
+                    <td class="px-6 py-4">${getStatusBadge(doc.status)}</td>
+                    <td class="px-6 py-4 text-xs text-slate-400">${displayDate || 'N/A'}</td>
+                    <td class="px-6 py-4 text-center text-xs font-bold text-brand">${doc.version || '1'}</td>
+                    <td class="px-6 py-4 text-xs text-slate-300">${doc.author || 'N/A'}</td>
+                    <td class="px-6 py-4 text-xs font-medium">${doc.specialty || 'General'}</td>
+                    <td class="px-6 py-4 text-xs text-slate-400 italic">${doc.doc_type || 'N/A'}</td>
+                    <td class="px-6 py-4 text-xs text-slate-400">${doc.contract || ''}</td>
+                </tr>
+            `;
+        });
+        tableHistBody.innerHTML = html;
+    } catch (e) {
+        console.error("Error en renderHistoryTable:", e);
+    }
+}
+
+function initHistMultiSelect(containerId, menuId, key, label) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const button = container.querySelector('button');
+    const menu = document.getElementById(menuId);
+
+    button.onclick = (e) => {
+        e.stopPropagation();
+        const isActive = menu.classList.contains('active');
+        document.querySelectorAll('.multiselect-menu').forEach(m => m.classList.remove('active'));
+        if (!isActive) menu.classList.add('active');
+    };
+
+    document.addEventListener('click', (e) => {
+        if (!container.contains(e.target)) menu.classList.remove('active');
+    });
+
+    const updateSelections = () => {
+        const checked = Array.from(menu.querySelectorAll('input:checked')).map(i => i.value);
+        selectedHistFilters[key] = checked;
+        
+        const span = button.querySelector('span');
+        if (checked.length === 0) {
+            span.textContent = `${label} (Todos)`;
+        } else if (checked.length === 1) {
+            span.textContent = checked[0];
+        } else {
+            span.textContent = `${checked.length} selecc.`;
+        }
+        
+        histCurrentPage = 1;
+        renderHistoryTable();
+    };
+
+    const values = [...new Set(historyDB.map(d => d[key]).filter(Boolean))].sort();
+    menu.innerHTML = values.map((val, idx) => `
+        <div class="multiselect-option">
+            <input type="checkbox" id="chk-hist-${key}-${idx}" value="${val}" ${selectedHistFilters[key].includes(val) ? 'checked' : ''}>
+            <label for="chk-hist-${key}-${idx}">${val}</label>
+        </div>
+    `).join('');
+
+    menu.querySelectorAll('input').forEach(chk => {
+        chk.onchange = updateSelections;
+    });
+}
+
+function updateHistFilterOptions() {
+    // 1. Selects Simples
+    const singleFields = [
+        { id: 'filterHistContractor', key: 'author', label: 'Contratista' },
+        { id: 'filterHistSpecialty', key: 'specialty', label: 'Disciplina' }
+    ];
+
+    singleFields.forEach(f => {
+        const el = document.getElementById(f.id);
+        if (!el) return;
+        const currentVal = el.value;
+        const uniqueValues = [...new Set(historyDB.map(d => d[f.key]).filter(v => v))].sort();
+        
+        let html = `<option value="">${f.label} (Todos)</option>`;
+        uniqueValues.forEach(val => {
+            html += `<option value="${val}" ${val === currentVal ? 'selected' : ''}>${val}</option>`;
+        });
+        el.innerHTML = html;
+    });
+
+    // 2. Selects Múltiples
+    initHistMultiSelect('containerHistStatus', 'menuHistStatus', 'status', 'Estatus');
+    initHistMultiSelect('containerHistRev', 'menuHistRev', 'revision', 'Rev');
+    initHistMultiSelect('containerHistDocType', 'menuHistDocType', 'doc_type', 'Tipo Doc');
+}
+
+btnStartHistSync.addEventListener('click', async () => {
+    if (isSyncing) return;
+    
+    const startStr = histDateStart.value;
+    const endStr = histDateEnd.value;
+    
+    if (!startStr || !endStr) {
+        alert("Por favor, selecciona un rango de fechas o una semana laboral.");
+        return;
+    }
+    
+    // Formatear fechas a YYYYMMDD para Aconex
+    const startFormatted = startStr.replace(/-/g, '');
+    const endFormatted = endStr.replace(/-/g, '');
+    const searchQuery = `lastmodified:[${startFormatted} TO ${endFormatted}]`;
+
+    globalConfig.projectId = confProjectId.value.trim();
+    globalConfig.region = confRegion.value;
+    globalConfig.username = confUser.value.trim();
+    globalConfig.password = confPass.value.trim();
+
+    if (!globalConfig.username || !globalConfig.password) {
+        alert("Por favor, configura las credenciales en el Panel Admin.");
+        tabs[2].click(); // Redirigir a Admin (ahora es el tab index 2)
+        return;
+    }
+
+    isSyncing = true;
+    btnStartHistSync.disabled = true;
+    histProgressContainer.classList.remove('hidden');
+    
+    historyDB = [];
+    if (techLog) techLog.value = "";
+    
+    const engine = new SyncEngine(null, globalConfig);
+
+    try {
+        await engine.syncAllData({
+            pageSize: parseInt(confPageSize.value, 10),
+            searchQuery: searchQuery,
+            showDocumentHistory: true,
+            onProgress: (current, total) => {
+                const percent = Math.round((current / total) * 100);
+                histProgressText.textContent = `Página ${current} de ${total}`;
+                histProgressPercent.textContent = `${percent}%`;
+                histProgressBar.style.width = `${percent}%`;
+            },
+            onDocumentUpsert: async (doc) => {
+                // En historial no deduplicamos por docno, ya que queremos ver todas las versiones.
+                // Sin embargo, para no duplicar exactamente el mismo registro si repetimos la carga,
+                // podemos validar la dupla única docno + version.
+                const idx = historyDB.findIndex(d => d.docno === doc.docno && d.version === doc.version);
+                if (idx > -1) {
+                    historyDB[idx] = doc;
+                } else {
+                    historyDB.push(doc);
+                }
+            },
+            onRawResponse: (xml) => {
+                if (techLog) techLog.value += `--- RESPUESTA HISTORIAL XML ---\n${xml}\n\n`;
+            },
+            onCircuitBreakerTrip: () => {
+                alert("Sincronización de Historial bloqueada por el Sentinel.");
+                throw new Error("Historial Sync Aborted by Sentinel.");
+            },
+            onFinish: () => {
+                isSyncing = false;
+                btnStartHistSync.disabled = false;
+                histProgressContainer.classList.add('hidden');
+                
+                updateHistFilterOptions();
+                renderHistoryTable();
+            },
+            onError: (err) => {
+                isSyncing = false;
+                btnStartHistSync.disabled = false;
+                histProgressContainer.classList.add('hidden');
+                
+                if (err.message !== "Historial Sync Aborted by Sentinel.") {
+                    alert(`Error extrayendo historial: ${err.message}`);
+                }
+                updateHistFilterOptions();
+                renderHistoryTable();
+            }
+        });
+    } catch (e) {
+        console.error("Error en extracción de historial:", e);
+    }
+});
+
+// Eventos de Filtro de Historial
+[filterHistSearch, filterHistContractor, filterHistSpecialty].forEach(el => {
+    if (!el) return;
+    el.addEventListener('change', () => { histCurrentPage = 1; renderHistoryTable(); });
+    if(el.id === 'filterHistSearch') el.addEventListener('input', () => { histCurrentPage = 1; renderHistoryTable(); });
+});
+
+// Paginación de Historial
+histPrev.addEventListener('click', () => { if (histCurrentPage > 1) { histCurrentPage--; renderHistoryTable(); } });
+histNext.addEventListener('click', () => { 
+    const totalPages = Math.ceil(applyHistoryFilters(historyDB).length / histPageSize);
+    if (histCurrentPage < totalPages) { histCurrentPage++; renderHistoryTable(); } 
+});
+histPagingSize.addEventListener('change', (e) => {
+    histPageSize = parseInt(e.target.value);
+    histCurrentPage = 1;
+    renderHistoryTable();
+});
+
+// Cabeceras ordenables del Historial
+document.querySelectorAll('th[data-sort-hist]').forEach(th => {
+    th.addEventListener('click', () => {
+        const field = th.dataset.sortHist;
+        if (histSortState.field === field) {
+            histSortState.direction = histSortState.direction === 'asc' ? 'desc' : 'asc';
+        } else {
+            histSortState.field = field;
+            histSortState.direction = 'asc';
+        }
+        histCurrentPage = 1;
+        
+        document.querySelectorAll('th[data-sort-hist] .sort-icon').forEach(icon => {
+            icon.textContent = '↕';
+            icon.classList.add('opacity-30');
+        });
+        const activeHeader = document.querySelector(`th[data-sort-hist="${field}"]`);
+        if (activeHeader) {
+            const icon = activeHeader.querySelector('.sort-icon');
+            icon.textContent = histSortState.direction === 'asc' ? '↑' : '↓';
+            icon.classList.remove('opacity-30');
+            icon.classList.add('opacity-100');
+        }
+        renderHistoryTable();
+    });
+});
