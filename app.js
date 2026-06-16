@@ -80,6 +80,16 @@ const histPagingSize = document.getElementById('histPagingSize');
 const histPrev = document.getElementById('histPrev');
 const histNext = document.getElementById('histNext');
 
+// Admin Login Elements & State
+const adminLoginForm = document.getElementById('adminLoginForm');
+const adminLoginContainer = document.getElementById('adminLoginContainer');
+const adminSettingsContainer = document.getElementById('adminSettingsContainer');
+const adminLoginUser = document.getElementById('adminLoginUser');
+const adminLoginPass = document.getElementById('adminLoginPass');
+const adminLoginError = document.getElementById('adminLoginError');
+
+let isAdminLogged = false;
+
 // State
 let localDB = []; 
 try {
@@ -184,6 +194,19 @@ let currentHistHitoFilter = 'all'; // 'all', 'hito360'
 // ======================================
 // 1. Navigation Logic
 // ======================================
+function checkAdminAccess() {
+    if (isAdminLogged) {
+        adminLoginContainer.classList.add('hidden');
+        adminSettingsContainer.classList.remove('hidden');
+    } else {
+        adminLoginContainer.classList.remove('hidden');
+        adminSettingsContainer.classList.add('hidden');
+        adminLoginUser.value = '';
+        adminLoginPass.value = '';
+        adminLoginError.classList.add('hidden');
+    }
+}
+
 tabs.forEach(tab => {
     tab.addEventListener('click', () => {
         tabs.forEach(t => t.classList.remove('active', 'text-brand'));
@@ -198,12 +221,30 @@ tabs.forEach(tab => {
                     populateWorkWeeks();
                     renderHistoryTable();
                 }
+                if (target === 'admin') {
+                    checkAdminAccess();
+                }
             } else {
                 v.classList.add('hidden');
                 v.classList.remove('active');
             }
         });
     });
+});
+
+adminLoginForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const user = adminLoginUser.value.trim();
+    const pass = adminLoginPass.value;
+
+    if (user === 'GAASCENCI' && pass === 'kipa4213.') {
+        isAdminLogged = true;
+        adminLoginError.classList.add('hidden');
+        checkAdminAccess();
+    } else {
+        adminLoginError.classList.remove('hidden');
+        adminLoginPass.value = '';
+    }
 });
 
 // ======================================
