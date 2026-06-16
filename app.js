@@ -66,6 +66,7 @@ const histWeekSelect = document.getElementById('histWeekSelect');
 const histDateStart = document.getElementById('histDateStart');
 const histDateEnd = document.getElementById('histDateEnd');
 const btnStartHistSync = document.getElementById('btnStartHistSync');
+const btnExportHistExcel = document.getElementById('btnExportHistExcel');
 const histProgressContainer = document.getElementById('histProgressContainer');
 const histProgressText = document.getElementById('histProgressText');
 const histProgressPercent = document.getElementById('histProgressPercent');
@@ -1265,6 +1266,12 @@ function renderHistoryTable() {
         let filtered = applyHistoryFilters(historyDB);
         updateHistorySummaryTables();
         
+        if (historyDB && historyDB.length > 0) {
+            btnExportHistExcel.classList.remove('hidden');
+        } else {
+            btnExportHistExcel.classList.add('hidden');
+        }
+        
         // Ordenamiento
         filtered.sort((a, b) => {
             let valA = a[histSortState.field] || '';
@@ -1439,6 +1446,7 @@ btnStartHistSync.addEventListener('click', async () => {
 
     isSyncing = true;
     btnStartHistSync.disabled = true;
+    btnExportHistExcel.classList.add('hidden');
     histProgressContainer.classList.remove('hidden');
     
     historyDB = [];
@@ -1581,4 +1589,184 @@ if (btnHistHitoAll && btnHistHito360) {
         histCurrentPage = 1;
         renderHistoryTable();
     });
+}
+
+function exportHistoryToExcel() {
+    try {
+        const query = (filterHistSearch ? filterHistSearch.value : '').trim().toLowerCase();
+        const contractorF = filterHistContractor ? filterHistContractor.value : '';
+        const specialtyF = filterHistSpecialty ? filterHistSpecialty.value : '';
+        
+        const summaryDocs = historyDB.filter(doc => {
+            const matchQ = !query || (doc.docno && doc.docno.toLowerCase().includes(query)) || (doc.title && doc.title.toLowerCase().includes(query));
+            const matchC = !contractorF || doc.author === contractorF;
+            const matchSpec = !specialtyF || doc.specialty === specialtyF;
+            
+            let matchHito = true;
+            if (currentHistHitoFilter === 'hito360') {
+                matchHito = doc.docno && HITO_360_DOCS.includes(doc.docno);
+            }
+            
+            return matchQ && matchC && matchSpec && matchHito;
+        });
+        
+        const targetDocs = summaryDocs.filter(doc => {
+            const s = (doc.status || '').toLowerCase().trim();
+            return s === 'emitido para estudio' || s === 'respuesta requerida';
+        });
+
+        // 1. Resumen por Revisión
+        let revB_cant = 0;
+        let revB_crit = 0;
+        let revP_cant = 0;
+        let revP_crit = 0;
+        
+        targetDocs.forEach(doc => {
+            const rev = (doc.revision || '').trim().toUpperCase();
+            const isCrit = doc.docno && HITO_360_DOCS.includes(doc.docno);
+            const isRevP = rev.startsWith('P') || /^\d/.test(rev);
+            
+            if (isRevP) {
+                revP_cant++;
+                if (isCrit) revP_crit++;
+            } else if (rev.length > 0) {
+                revB_cant++;
+                if (isCrit) revB_crit++;
+            }
+        });
+        
+        const totalCant = revB_cant + revP_cant;
+        const totalCrit = revB_crit + revB_crit; // wait, let's make sure it is revB_crit + revP_crit
+        const totalCritCorrect = revB_crit + revP_crit;
+
+        // 2. Resumen por Contratista
+        const contractorMap = {};
+        targetDocs.forEach(doc => {
+            const contractor = doc.author || 'N/A';
+            const isCrit = doc.docno && HITO_360_DOCS.includes(doc.docno);
+            const rev = (doc.revision || '').trim().toUpperCase();
+            const isRevP = rev.startsWith('P') || /^\d/.test(rev);
+            
+            if (!contractorMap[contractor]) {
+                contractorMap[contractor] = { revB: 0, revP: 0, crit: 0 };
+            }
+            if (isRevP) {
+                contractorMap[contractor].revP++;
+            } else if (rev.length > 0) {
+                contractorMap[contractor].revB++;
+            }
+            if (isCrit) contractorMap[contractor].crit++;
+        });
+        
+        const contractorList = Object.keys(contractorMap).map(name => {
+            const c = contractorMap[name];
+            return {
+                name: name,
+                revB: c.revB,
+                revP: c.revP,
+                total: c.revB + c.revP,
+                crit: c.crit
+            };
+        }).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+
+        const wb = XLSX.utils.book_new();
+
+        // Armamos la hoja 1: Resumen
+        const resumenAOA = [
+            ["REPORTE RESUMEN DE HISTORIAL DE DOCUMENTOS"],
+            ["Fecha Reporte:", new Date().toLocaleDateString('es-ES')],
+            ["Rango:", `${histDateStart.value} a ${histDateEnd.value}`],
+            [],
+            ["1. RESUMEN POR REVISIÓN (Emitidos Estudio / Resp. Requerida)"],
+            ["Revisión", "Cantidad", "Críticos (Hito 360)"],
+            ["Rev B", revB_cant, revB_crit],
+            ["Rev P", revP_cant, revP_crit],
+            ["TOTAL", totalCant, totalCritCorrect],
+            [],
+            [],
+            ["2. RESUMEN POR CONTRATISTA (Emitidos Estudio / Resp. Requerida)"],
+            ["Contratista", "Rev B", "Rev P", "Críticos (Hito 360)", "Total"]
+        ];
+
+        contractorList.forEach(c => {
+            resumenAOA.push([c.name, c.revB, c.revP, c.crit, c.total]);
+        });
+
+        if (contractorList.length === 0) {
+            resumenAOA.push(["No hay contratistas registrados", 0, 0, 0, 0]);
+        }
+
+        const wsResumen = XLSX.utils.aoa_to_sheet(resumenAOA);
+        XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen");
+
+        // Armamos la hoja 2: Detalle
+        const detalleHeaders = [
+            "Doc NO", 
+            "Título", 
+            "Revisión", 
+            "Estatus", 
+            "Fecha Modificación", 
+            "Versión", 
+            "Contratista", 
+            "Función o Disciplina", 
+            "Tipo Documento", 
+            "Contrato", 
+            "Crítico (Hito 360)"
+        ];
+
+        const detalleRows = targetDocs.map(doc => {
+            const isCrit = doc.docno && HITO_360_DOCS.includes(doc.docno) ? "Sí" : "No";
+            
+            let displayDate = doc.modified_date || '';
+            if (displayDate) {
+                const date = new Date(displayDate);
+                if (!isNaN(date)) {
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const year = date.getFullYear();
+                    displayDate = `${day}-${month}-${year}`;
+                }
+            }
+
+            return [
+                doc.docno || '',
+                doc.title || '',
+                doc.revision || '',
+                doc.status || '',
+                displayDate,
+                doc.version || '1',
+                doc.author || '',
+                doc.specialty || '',
+                doc.doc_type || '',
+                doc.contract || '',
+                isCrit
+            ];
+        });
+
+        const detalleAOA = [
+            ["DETALLE DE DOCUMENTOS INVOLUCRADOS EN EL RESUMEN"],
+            ["Filtros aplicados - Búsqueda:", query || "Ninguno", "Contratista:", contractorF || "Todos", "Disciplina:", specialtyF || "Todas"],
+            [],
+            detalleHeaders,
+            ...detalleRows
+        ];
+
+        if (detalleRows.length === 0) {
+            detalleAOA.push(["No se encontraron documentos para los filtros seleccionados", "", "", "", "", "", "", "", "", "", ""]);
+        }
+
+        const wsDetalle = XLSX.utils.aoa_to_sheet(detalleAOA);
+        XLSX.utils.book_append_sheet(wb, wsDetalle, "Detalle Documentos");
+
+        // Guardamos el archivo Excel
+        const fileName = `Reporte_Historial_${histDateStart.value}_${histDateEnd.value}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+    } catch (e) {
+        console.error("Error al exportar a Excel:", e);
+        alert("Error al generar el reporte Excel: " + e.message);
+    }
+}
+
+if (btnExportHistExcel) {
+    btnExportHistExcel.addEventListener('click', exportHistoryToExcel);
 }
