@@ -1758,6 +1758,102 @@ function exportHistoryToExcel() {
         const wsDetalle = XLSX.utils.aoa_to_sheet(detalleAOA);
         XLSX.utils.book_append_sheet(wb, wsDetalle, "Detalle Documentos");
 
+        // 3. Documentos Críticos (hoja adicional)
+        const criticalDocs = targetDocs.filter(doc => doc.docno && HITO_360_DOCS.includes(doc.docno));
+
+        // Dividir en Rev B y Rev P
+        const criticalRevB = criticalDocs.filter(doc => {
+            const rev = (doc.revision || '').trim().toUpperCase();
+            const isRevP = rev.startsWith('P') || /^\d/.test(rev);
+            return !isRevP && rev.length > 0;
+        });
+
+        const criticalRevP = criticalDocs.filter(doc => {
+            const rev = (doc.revision || '').trim().toUpperCase();
+            const isRevP = rev.startsWith('P') || /^\d/.test(rev);
+            return isRevP;
+        });
+
+        const criticosHeaders = [
+            "Número de Documento",
+            "Título",
+            "Revisión",
+            "Contratista",
+            "Fecha de ingreso (Fecha de modificación)",
+            "Estatus",
+            "Fecha entrega a ESED"
+        ];
+
+        const getDocRowData = (doc) => {
+            const dashboardDoc = localDB.find(d => d.docno === doc.docno);
+            const currentStatus = dashboardDoc ? dashboardDoc.status : 'N/A';
+            const esedDateRaw = dashboardDoc ? dashboardDoc.modified_date : 'N/A';
+
+            let displayIngresoDate = doc.modified_date || '';
+            if (displayIngresoDate) {
+                const date = new Date(displayIngresoDate);
+                if (!isNaN(date)) {
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const year = date.getFullYear();
+                    displayIngresoDate = `${day}-${month}-${year}`;
+                }
+            }
+
+            let displayEsedDate = esedDateRaw || '';
+            if (displayEsedDate && displayEsedDate !== 'N/A') {
+                const date = new Date(displayEsedDate);
+                if (!isNaN(date)) {
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const year = date.getFullYear();
+                    displayEsedDate = `${day}-${month}-${year}`;
+                }
+            }
+
+            return [
+                doc.docno || '',
+                doc.title || '',
+                doc.revision || '',
+                doc.author || '',
+                displayIngresoDate,
+                currentStatus,
+                displayEsedDate
+            ];
+        };
+
+        const criticosAOA = [
+            ["REPORTE DE DOCUMENTOS CRÍTICOS (Hito 360)"],
+            ["Filtro de fecha:", `${histDateStart.value} a ${histDateEnd.value}`],
+            [],
+            ["DOCUMENTOS CRÍTICOS EN REVISIÓN B"],
+            criticosHeaders
+        ];
+
+        if (criticalRevB.length > 0) {
+            criticalRevB.forEach(doc => {
+                criticosAOA.push(getDocRowData(doc));
+            });
+        } else {
+            criticosAOA.push(["No se encontraron documentos críticos en Rev B", "", "", "", "", "", ""]);
+        }
+
+        criticosAOA.push([]);
+        criticosAOA.push([]);
+        criticosAOA.push(["DOCUMENTOS CRÍTICOS EN REVISIÓN P"]);
+        criticosAOA.push(criticosHeaders);
+
+        if (criticalRevP.length > 0) {
+            criticalRevP.forEach(doc => {
+                criticosAOA.push(getDocRowData(doc));
+            });
+        } else {
+            criticosAOA.push(["No se encontraron documentos críticos en Rev P", "", "", "", "", "", ""]);
+        }
+
+        const wsCriticos = XLSX.utils.aoa_to_sheet(criticosAOA);
+        XLSX.utils.book_append_sheet(wb, wsCriticos, "Documentos críticos");
+
         // Guardamos el archivo Excel
         const fileName = `Reporte_Historial_${histDateStart.value}_${histDateEnd.value}.xlsx`;
         XLSX.writeFile(wb, fileName);
