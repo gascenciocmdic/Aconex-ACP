@@ -1697,7 +1697,6 @@ function exportHistoryToExcel() {
         }
 
         const wsResumen = XLSX.utils.aoa_to_sheet(resumenAOA);
-        XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen");
 
         // Armamos la hoja 2: Detalle
         const detalleHeaders = [
@@ -1756,7 +1755,6 @@ function exportHistoryToExcel() {
         }
 
         const wsDetalle = XLSX.utils.aoa_to_sheet(detalleAOA);
-        XLSX.utils.book_append_sheet(wb, wsDetalle, "Detalle Documentos");
 
         // 3. Documentos Críticos (hoja adicional)
         const criticalDocs = targetDocs.filter(doc => doc.docno && HITO_360_DOCS.includes(doc.docno));
