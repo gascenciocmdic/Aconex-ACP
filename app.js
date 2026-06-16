@@ -1812,7 +1812,9 @@ function exportHistoryToExcel() {
             }
 
             const currentStatusNorm = currentStatus.toLowerCase().trim();
-            if (currentStatusNorm !== 'respuesta requerida' && currentStatusNorm !== 'emitido para estudio') {
+            if (currentStatusNorm !== 'para acción' && 
+                currentStatusNorm !== 'para accion' && 
+                currentStatusNorm !== 'solo toma de conocimiento') {
                 displayEsedDate = '';
             }
 
