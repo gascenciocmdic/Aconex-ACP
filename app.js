@@ -1859,6 +1859,14 @@ function exportHistoryToExcel() {
         }
 
         const wsCriticos = XLSX.utils.aoa_to_sheet(criticosAOA);
+        
+        // Aplica estilos ejecutivos a cada hoja
+        applyExecutiveStyle(wsResumen, 'resumen');
+        applyExecutiveStyle(wsDetalle, 'detalle');
+        applyExecutiveStyle(wsCriticos, 'criticos');
+
+        XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen");
+        XLSX.utils.book_append_sheet(wb, wsDetalle, "Detalle Documentos");
         XLSX.utils.book_append_sheet(wb, wsCriticos, "Documentos críticos");
 
         // Guardamos el archivo Excel
@@ -1868,6 +1876,170 @@ function exportHistoryToExcel() {
         console.error("Error al exportar a Excel:", e);
         alert("Error al generar el reporte Excel: " + e.message);
     }
+}
+
+function applyExecutiveStyle(ws, type) {
+    const fontName = "Segoe UI";
+    
+    const styleTitle = {
+        font: { name: fontName, sz: 14, bold: true, color: { rgb: "1E3A8A" } },
+        alignment: { vertical: "center", horizontal: "left" }
+    };
+    
+    const styleSubtitle = {
+        font: { name: fontName, sz: 9.5, italic: true, color: { rgb: "475569" } },
+        alignment: { vertical: "center", horizontal: "left" }
+    };
+    
+    const styleSection = {
+        fill: { fgColor: { rgb: "F1F5F9" } },
+        font: { name: fontName, sz: 11, bold: true, color: { rgb: "1E3A8A" } },
+        alignment: { vertical: "center", horizontal: "left" },
+        border: {
+            bottom: { style: "medium", color: { rgb: "3B82F6" } }
+        }
+    };
+    
+    const styleHeader = {
+        fill: { fgColor: { rgb: "1E3A8A" } },
+        font: { name: fontName, sz: 9.5, bold: true, color: { rgb: "FFFFFF" } },
+        alignment: { vertical: "center", horizontal: "center", wrapText: true },
+        border: {
+            top: { style: "thin", color: { rgb: "D1D5DB" } },
+            bottom: { style: "medium", color: { rgb: "111827" } },
+            left: { style: "thin", color: { rgb: "D1D5DB" } },
+            right: { style: "thin", color: { rgb: "D1D5DB" } }
+        }
+    };
+    
+    const styleDataLeft = {
+        font: { name: fontName, sz: 9 },
+        alignment: { vertical: "center", horizontal: "left" },
+        border: {
+            top: { style: "thin", color: { rgb: "E5E7EB" } },
+            bottom: { style: "thin", color: { rgb: "E5E7EB" } },
+            left: { style: "thin", color: { rgb: "E5E7EB" } },
+            right: { style: "thin", color: { rgb: "E5E7EB" } }
+        }
+    };
+    
+    const styleDataCenter = {
+        font: { name: fontName, sz: 9 },
+        alignment: { vertical: "center", horizontal: "center" },
+        border: {
+            top: { style: "thin", color: { rgb: "E5E7EB" } },
+            bottom: { style: "thin", color: { rgb: "E5E7EB" } },
+            left: { style: "thin", color: { rgb: "E5E7EB" } },
+            right: { style: "thin", color: { rgb: "E5E7EB" } }
+        }
+    };
+    
+    const styleTotal = {
+        fill: { fgColor: { rgb: "F8FAFC" } },
+        font: { name: fontName, sz: 9.5, bold: true, color: { rgb: "0F172A" } },
+        alignment: { vertical: "center", horizontal: "center" },
+        border: {
+            top: { style: "thin", color: { rgb: "000000" } },
+            bottom: { style: "double", color: { rgb: "000000" } },
+            left: { style: "thin", color: { rgb: "E5E7EB" } },
+            right: { style: "thin", color: { rgb: "E5E7EB" } }
+        }
+    };
+
+    const styleTotalLeft = {
+        fill: { fgColor: { rgb: "F8FAFC" } },
+        font: { name: fontName, sz: 9.5, bold: true, color: { rgb: "0F172A" } },
+        alignment: { vertical: "center", horizontal: "left" },
+        border: {
+            top: { style: "thin", color: { rgb: "000000" } },
+            bottom: { style: "double", color: { rgb: "000000" } },
+            left: { style: "thin", color: { rgb: "E5E7EB" } },
+            right: { style: "thin", color: { rgb: "E5E7EB" } }
+        }
+    };
+
+    let pSectionRow = -1;
+    let pHeaderRow = -1;
+
+    if (type === 'criticos') {
+        for (const key in ws) {
+            if (key[0] === '!') continue;
+            const coord = XLSX.utils.decode_cell(key);
+            if (coord.c === 0 && ws[key].v) {
+                const val = String(ws[key].v);
+                if (val === "DOCUMENTOS CRÍTICOS EN REVISIÓN P") {
+                    pSectionRow = coord.r;
+                } else if (pSectionRow > 0 && val === "Número de Documento") {
+                    pHeaderRow = coord.r;
+                    break;
+                }
+            }
+        }
+    }
+
+    const colWidths = {};
+
+    for (const key in ws) {
+        if (key[0] === '!') continue;
+        const cell = ws[key];
+        const cellVal = cell.v !== undefined ? String(cell.v) : '';
+        const coord = XLSX.utils.decode_cell(key);
+        const r = coord.r;
+        const c = coord.c;
+
+        colWidths[c] = Math.max(colWidths[c] || 8, cellVal.length + 3);
+
+        if (type === 'resumen') {
+            if (r === 0) {
+                cell.s = styleTitle;
+            } else if (r === 1 || r === 2) {
+                cell.s = styleSubtitle;
+            } else if (r === 4 || r === 11) {
+                cell.s = styleSection;
+            } else if (r === 5 || r === 12) {
+                cell.s = styleHeader;
+            } else if (r === 8) {
+                cell.s = c === 0 ? styleTotalLeft : styleTotal;
+            } else if (r > 5 && r < 8) {
+                cell.s = c === 0 ? styleDataLeft : styleDataCenter;
+            } else if (r > 12) {
+                cell.s = c === 0 ? styleDataLeft : styleDataCenter;
+            }
+        } else if (type === 'detalle') {
+            if (r === 0) {
+                cell.s = styleTitle;
+            } else if (r === 1) {
+                cell.s = styleSubtitle;
+            } else if (r === 3) {
+                cell.s = styleHeader;
+            } else if (r > 3) {
+                cell.s = (c === 0 || c === 2 || c === 4 || c === 5 || c === 10) ? styleDataCenter : styleDataLeft;
+            }
+        } else if (type === 'criticos') {
+            if (r === 0) {
+                cell.s = styleTitle;
+            } else if (r === 1) {
+                cell.s = styleSubtitle;
+            } else if (r === 3 || r === pSectionRow) {
+                cell.s = styleSection;
+            } else if (r === 4 || r === pHeaderRow) {
+                cell.s = styleHeader;
+            } else if (r > 4) {
+                if (cellVal.startsWith("No se encontraron")) {
+                    cell.s = styleDataLeft;
+                } else {
+                    cell.s = (c === 0 || c === 2 || c === 4 || c === 5 || c === 6) ? styleDataCenter : styleDataLeft;
+                }
+            }
+        }
+    }
+
+    const colsArray = [];
+    const maxCols = Math.max(...Object.keys(colWidths).map(Number)) + 1;
+    for (let i = 0; i < maxCols; i++) {
+        colsArray.push({ wch: colWidths[i] || 12 });
+    }
+    ws['!cols'] = colsArray;
 }
 
 if (btnExportHistExcel) {
