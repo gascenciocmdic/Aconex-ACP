@@ -1811,6 +1811,11 @@ function exportHistoryToExcel() {
                 }
             }
 
+            const currentStatusNorm = currentStatus.toLowerCase().trim();
+            if (currentStatusNorm !== 'respuesta requerida' && currentStatusNorm !== 'emitido para estudio') {
+                displayEsedDate = '';
+            }
+
             return [
                 doc.docno || '',
                 doc.title || '',
