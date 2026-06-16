@@ -237,7 +237,7 @@ adminLoginForm.addEventListener('submit', (e) => {
     const user = adminLoginUser.value.trim();
     const pass = adminLoginPass.value;
 
-    if (user === 'GAASCENCI' && pass === 'kipa4213.') {
+    if (user === 'GAASCENCI' && pass === 'kipa4213') {
         isAdminLogged = true;
         adminLoginError.classList.add('hidden');
         checkAdminAccess();
